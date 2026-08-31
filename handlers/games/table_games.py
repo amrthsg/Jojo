@@ -30,7 +30,7 @@ class GameStates(StatesGroup):
 async def handle_games_menu(message: Message):
     user = get_user(message.from_user.id)
     if not user:
-        await message.answer("اول باید /start بزنی 🐱")
+        await message.answer("اول باید /start بزنی 🐤")
         return
 
     if user["level"] < GAMES_MIN_LEVEL:
