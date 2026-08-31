@@ -1,5 +1,5 @@
 # utils/leveling.py
-# محاسبات مربوط به سطح، کول‌داون میو و پاداش
+# محاسبات مربوط به سطح، کول‌داون جیک و پاداش
 
 import random
 from config import (
@@ -25,7 +25,7 @@ def get_cooldown_seconds(level: int) -> int:
 
 def get_exp_required_for_level(level: int) -> int:
     """
-    تعداد میوی تجمعی موردنیاز برای رسیدن به یک سطح.
+    تعداد جیک تجمعی موردنیاز برای رسیدن به یک سطح.
     فرمول تقریبی بر اساس داده‌های مشاهده‌شده (رشد تصاعدی ملایم).
     سطح 1 = 0, سطح 2 = 5, سطح 4 = 40, سطح 7 = 175, سطح 10 = 475 ...
     """
@@ -37,7 +37,7 @@ def get_exp_required_for_level(level: int) -> int:
 
 def get_reward_range_for_level(level: int) -> tuple[int, int]:
     """
-    رنج پاداش میو کردن برای یک سطح مشخص (min, max).
+    رنج پاداش جیک کردن برای یک سطح مشخص (min, max).
     بر اساس مشاهدات: سطح 1: 5-15, سطح 25: 500-925, سطح 50: 1500-2500
     """
     base_min = 5 + int(level * 30)
@@ -70,7 +70,7 @@ def check_level_up(current_level: int, current_exp: int):
 
 
 def perform_meow(level: int) -> int:
-    """یک بار میو کردن انجام میده و مقدار پوینت دریافتی رو برمیگردونه"""
+    """یک بار جیک کردن انجام میده و مقدار پوینت دریافتی رو برمیگردونه"""
     min_r, max_r = get_reward_range_for_level(level)
     return random.randint(min_r, max_r)
 
