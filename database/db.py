@@ -31,13 +31,14 @@ def init_db():
             username TEXT,
             pet_name TEXT DEFAULT 'جوجو',
             level INTEGER DEFAULT 1,
-            exp INTEGER DEFAULT 0,           -- تعداد میو انجام شده (تجمعی)
-            meow_points INTEGER DEFAULT 0,   -- موجودی کیف پول (wallet)
+            exp INTEGER DEFAULT 0,           -- تعداد جیک انجام شده (تجمعی)
+            meow_points INTEGER DEFAULT 0,   -- موجودی کیف پول (wallet) - نام فیلد به تاریخی دلایل تغییر نکرده
             capacity INTEGER DEFAULT 15625,  -- ظرفیت شکم/جیب
             rank_level INTEGER DEFAULT 1,    -- مقام (هر ۵ سطح ارتقا)
-            last_meow_time INTEGER DEFAULT 0,   -- unix timestamp
+            last_meow_time INTEGER DEFAULT 0,   -- unix timestamp آخرین جیک
             last_name_change INTEGER DEFAULT 0,
             is_banned INTEGER DEFAULT 0,
+            is_jailed INTEGER DEFAULT 0,     -- زندانی توسط ادمین (جدا از بن کامل)
             created_at INTEGER DEFAULT (strftime('%s','now'))
         )
     """)
@@ -125,6 +126,16 @@ def init_db():
             amount INTEGER,
             note TEXT,
             timestamp INTEGER DEFAULT (strftime('%s','now'))
+        )
+    """)
+
+    # ادمین‌های پویا که بعد از نصب اولیه توسط مالک اضافه شدن
+    # (ادمین‌های تعریف‌شده تو config.py با ADMIN_IDS جداگانه چک میشن)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS admins (
+            user_id INTEGER PRIMARY KEY,
+            added_by INTEGER,
+            added_at INTEGER DEFAULT (strftime('%s','now'))
         )
     """)
 

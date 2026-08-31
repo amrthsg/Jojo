@@ -94,6 +94,21 @@ def set_level(user_id: int, new_level: int, new_capacity: int, new_rank: int):
     conn.close()
 
 
+def set_jailed(user_id: int, jailed: bool):
+    """
+    زندانی کردن یا آزاد کردن کاربر توسط ادمین.
+    برخلاف is_banned (که کلاً ربات رو غیرفعال میکنه)، زندان فقط جیک کردن
+    و بازی‌ها رو مسدود میکنه؛ منطق مسدودسازی دقیق تو هندلرها چک میشه.
+    """
+    conn = get_connection()
+    conn.execute(
+        "UPDATE users SET is_jailed = ? WHERE user_id = ?",
+        (1 if jailed else 0, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
 def set_banned(user_id: int, banned: bool):
     conn = get_connection()
     conn.execute(
@@ -133,3 +148,44 @@ def get_total_stats():
     ).fetchone()
     conn.close()
     return row
+
+
+# ---------------- مدیریت ادمین‌های پویا ----------------
+# این توابع کاملاً جدا از ADMIN_IDS تو config.py هستن.
+# ADMIN_IDS = ادمین‌های اولیه‌ی نصب (ثابت، فقط دستی قابل تغییر).
+# جدول admins = ادمین‌هایی که مالک (owner) بعداً از داخل خود ربات اضافه/حذف کرده.
+
+def add_admin(user_id: int, added_by: int):
+    conn = get_connection()
+    conn.execute(
+        "INSERT OR IGNORE INTO admins (user_id, added_by) VALUES (?, ?)",
+        (user_id, added_by),
+    )
+    conn.commit()
+    conn.close()
+
+
+def remove_admin(user_id: int):
+    conn = get_connection()
+    conn.execute("DELETE FROM admins WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+
+def is_dynamic_admin(user_id: int) -> bool:
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT 1 FROM admins WHERE user_id = ?", (user_id,)
+    ).fetchone()
+    conn.close()
+    return row is not None
+
+
+def get_all_dynamic_admins():
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT user_id, added_by, added_at FROM admins ORDER BY added_at DESC"
+    ).fetchall()
+    conn.close()
+    return rows
+
