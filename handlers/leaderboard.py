@@ -23,7 +23,7 @@ def _format_leaderboard(rows, title: str) -> str:
     return "\n".join(lines)
 
 
-@router.message(F.text == "🏆 لیدربرد")
+@router.message(F.text.in_({"لیدربرد", "🏆 لیدربرد"}))
 async def handle_leaderboard_menu(message: Message):
     await message.answer(
         "🏆 کدوم لیدربرد رو میخوای ببینی؟",

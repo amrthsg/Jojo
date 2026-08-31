@@ -25,7 +25,7 @@ def _seed_default_items():
                VALUES (?, ?, ?, ?)""",
             [
                 ("جوجه گمشده", 500, "stray_chick", "یک جوجه‌ی تنها برای پناه دادن"),
-                ("دونه غذای طلایی", 300, "food", "افزایش سرعت میو کردن برای مدتی"),
+                ("دونه غذای طلایی", 300, "food", "افزایش سرعت جیک کردن برای مدتی"),
             ],
         )
         conn.commit()
@@ -48,7 +48,7 @@ def _market_kb():
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
-@router.message(F.text == "🛍 مارکت")
+@router.message(F.text.in_({"مارکت", "🛍 مارکت"}))
 async def handle_market(message: Message):
     _seed_default_items()
     await message.answer(

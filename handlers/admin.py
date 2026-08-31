@@ -1,5 +1,5 @@
 # handlers/admin.py
-# پنل ادمین: اهدای پوینت، آمار، بن/آنبن، ویرایش کاربر، پیام همگانی
+# پنل ادمین: اهدای پوینت، آمار، بن/آنبن، زندان، مدیریت ادمین، پیام همگانی
 
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
@@ -11,18 +11,32 @@ from database.models import (
     get_user,
     add_meow_points,
     set_banned,
+    set_jailed,
     set_level,
     get_total_stats,
+    add_admin,
+    remove_admin,
+    is_dynamic_admin,
+    get_all_dynamic_admins,
 )
 from database.db import get_connection
 from keyboards.main_kb import admin_panel_kb
-from config import ADMIN_IDS, ADMIN_GIFT_MAX_AMOUNT, CURRENCY_EMOJI
+from config import ADMIN_IDS, OWNER_ID, ADMIN_GIFT_MAX_AMOUNT, CURRENCY_EMOJI
 
 router = Router()
 
 
 def is_admin(user_id: int) -> bool:
-    return user_id in ADMIN_IDS
+    """
+    ادمین = یا تو لیست ثابت ADMIN_IDS (نصب اولیه) هست، یا مالک (owner)
+    از داخل ربات اضافه‌ش کرده (جدول admins).
+    """
+    return user_id in ADMIN_IDS or is_dynamic_admin(user_id)
+
+
+def is_owner(user_id: int) -> bool:
+    """فقط مالک اصلی - تنها کسی که میتونه ادمین اضافه/حذف کنه."""
+    return user_id == OWNER_ID
 
 
 class AdminStates(StatesGroup):
@@ -30,7 +44,11 @@ class AdminStates(StatesGroup):
     waiting_gift_amount = State()
     waiting_ban_target = State()
     waiting_unban_target = State()
+    waiting_jail_target = State()
+    waiting_unjail_target = State()
     waiting_broadcast_text = State()
+    waiting_addadmin_target = State()
+    waiting_removeadmin_target = State()
 
 
 def _log_admin_action(admin_id: int, action: str, target_user: int | None, amount: int, note: str = ""):
@@ -51,7 +69,7 @@ async def cmd_admin_panel(message: Message):
 
     await message.answer(
         "⚙️ <b>پنل مدیریت جوجو</b>",
-        reply_markup=admin_panel_kb(),
+        reply_markup=admin_panel_kb(is_owner=is_owner(message.from_user.id)),
         parse_mode="HTML",
     )
 
@@ -191,6 +209,176 @@ async def process_unban(message: Message, state: FSMContext):
     _log_admin_action(message.from_user.id, "unban", target_id, 0)
     await message.answer(f"✅ مسدودیت کاربر {target_id} برداشته شد.")
     await state.clear()
+
+
+@router.callback_query(F.data == "admin_jail")
+async def cb_admin_jail(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("دسترسی نداری", show_alert=True)
+        return
+    await callback.message.answer("🔒 آیدی عددی کاربر برای زندانی کردن رو بفرست:")
+    await state.set_state(AdminStates.waiting_jail_target)
+    await callback.answer()
+
+
+@router.message(AdminStates.waiting_jail_target)
+async def process_jail(message: Message, state: FSMContext):
+    if not message.text.isdigit():
+        await message.answer("❌ فقط آیدی عددی معتبره.")
+        await state.clear()
+        return
+
+    target_id = int(message.text)
+    set_jailed(target_id, True)
+    _log_admin_action(message.from_user.id, "jail", target_id, 0)
+    await message.answer(f"🔒 کاربر {target_id} زندانی شد.")
+
+    try:
+        await message.bot.send_message(target_id, "🔒 جوجوت توسط ادمین زندانی شد.")
+    except Exception:
+        pass
+
+    await state.clear()
+
+
+@router.callback_query(F.data == "admin_unjail")
+async def cb_admin_unjail(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("دسترسی نداری", show_alert=True)
+        return
+    await callback.message.answer("🔓 آیدی عددی کاربر برای آزاد کردن از زندان رو بفرست:")
+    await state.set_state(AdminStates.waiting_unjail_target)
+    await callback.answer()
+
+
+@router.message(AdminStates.waiting_unjail_target)
+async def process_unjail(message: Message, state: FSMContext):
+    if not message.text.isdigit():
+        await message.answer("❌ فقط آیدی عددی معتبره.")
+        await state.clear()
+        return
+
+    target_id = int(message.text)
+    set_jailed(target_id, False)
+    _log_admin_action(message.from_user.id, "unjail", target_id, 0)
+    await message.answer(f"🔓 کاربر {target_id} از زندان آزاد شد.")
+
+    try:
+        await message.bot.send_message(target_id, "🔓 جوجوت آزاد شد! می‌تونی دوباره جیک کنی.")
+    except Exception:
+        pass
+
+    await state.clear()
+
+
+@router.callback_query(F.data == "owner_add_admin")
+async def cb_owner_add_admin(callback: CallbackQuery, state: FSMContext):
+    if not is_owner(callback.from_user.id):
+        await callback.answer("فقط مالک ربات میتونه این کارو بکنه", show_alert=True)
+        return
+    await callback.message.answer("👑 آیدی عددی کاربری که میخوای ادمین بشه رو بفرست:")
+    await state.set_state(AdminStates.waiting_addadmin_target)
+    await callback.answer()
+
+
+@router.message(AdminStates.waiting_addadmin_target)
+async def process_add_admin(message: Message, state: FSMContext):
+    if not message.text.isdigit():
+        await message.answer("❌ فقط آیدی عددی معتبره.")
+        await state.clear()
+        return
+
+    target_id = int(message.text)
+
+    if target_id in ADMIN_IDS or is_dynamic_admin(target_id):
+        await message.answer("⚠️ این کاربر از قبل ادمینه.")
+        await state.clear()
+        return
+
+    add_admin(target_id, message.from_user.id)
+    _log_admin_action(message.from_user.id, "add_admin", target_id, 0)
+    await message.answer(f"✅ کاربر {target_id} به عنوان ادمین اضافه شد.")
+
+    try:
+        await message.bot.send_message(target_id, "👑 تبریک! شما ادمین ربات جوجو شدید.")
+    except Exception:
+        pass
+
+    await state.clear()
+
+
+@router.callback_query(F.data == "owner_remove_admin")
+async def cb_owner_remove_admin(callback: CallbackQuery, state: FSMContext):
+    if not is_owner(callback.from_user.id):
+        await callback.answer("فقط مالک ربات میتونه این کارو بکنه", show_alert=True)
+        return
+    await callback.message.answer("👑 آیدی عددی ادمینی که میخوای حذف کنی رو بفرست:")
+    await state.set_state(AdminStates.waiting_removeadmin_target)
+    await callback.answer()
+
+
+@router.message(AdminStates.waiting_removeadmin_target)
+async def process_remove_admin(message: Message, state: FSMContext):
+    if not message.text.isdigit():
+        await message.answer("❌ فقط آیدی عددی معتبره.")
+        await state.clear()
+        return
+
+    target_id = int(message.text)
+
+    if target_id == OWNER_ID:
+        await message.answer("❌ نمیتونی مالک ربات رو حذف کنی.")
+        await state.clear()
+        return
+
+    if target_id in ADMIN_IDS:
+        await message.answer(
+            "⚠️ این کاربر جزو ادمین‌های اولیه (تو config.py) هست و از داخل ربات "
+            "قابل حذف نیست. باید مستقیم از فایل config.py رو سرور حذفش کنی."
+        )
+        await state.clear()
+        return
+
+    if not is_dynamic_admin(target_id):
+        await message.answer("⚠️ این کاربر اصلاً ادمین نیست.")
+        await state.clear()
+        return
+
+    remove_admin(target_id)
+    _log_admin_action(message.from_user.id, "remove_admin", target_id, 0)
+    await message.answer(f"✅ کاربر {target_id} از ادمین‌ها حذف شد.")
+
+    try:
+        await message.bot.send_message(target_id, "شما دیگر ادمین ربات جوجو نیستید.")
+    except Exception:
+        pass
+
+    await state.clear()
+
+
+@router.callback_query(F.data == "owner_list_admins")
+async def cb_owner_list_admins(callback: CallbackQuery):
+    if not is_owner(callback.from_user.id):
+        await callback.answer("فقط مالک ربات میتونه این کارو بکنه", show_alert=True)
+        return
+
+    dynamic_admins = get_all_dynamic_admins()
+
+    lines = ["👑 <b>لیست ادمین‌های ربات جوجو</b>\n"]
+    lines.append("<b>ادمین‌های اولیه (ثابت):</b>")
+    for admin_id in ADMIN_IDS:
+        owner_tag = " (مالک)" if admin_id == OWNER_ID else ""
+        lines.append(f"• <code>{admin_id}</code>{owner_tag}")
+
+    lines.append("\n<b>ادمین‌های افزوده‌شده:</b>")
+    if dynamic_admins:
+        for admin in dynamic_admins:
+            lines.append(f"• <code>{admin['user_id']}</code>")
+    else:
+        lines.append("هیچکس")
+
+    await callback.message.answer("\n".join(lines), parse_mode="HTML")
+    await callback.answer()
 
 
 @router.callback_query(F.data == "admin_broadcast")

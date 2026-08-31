@@ -1,5 +1,5 @@
 # handlers/bank.py
-# هندلر بخش بانک میویی
+# هندلر بخش بانک جوجو
 
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
@@ -30,7 +30,7 @@ class BankStates(StatesGroup):
     waiting_transfer_amount = State()
 
 
-@router.message(F.text == "🏦 بانک")
+@router.message(F.text.in_({"بانک", "🏦 بانک"}))
 async def handle_bank_menu(message: Message):
     user_id = message.from_user.id
     user = get_user(user_id)

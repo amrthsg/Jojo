@@ -6,7 +6,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart
 
 from database.models import create_user_if_not_exists, get_user
-from keyboards.main_kb import main_menu_kb, welcome_inline_kb
+from keyboards.main_kb import welcome_inline_kb
 from config import DEFAULT_PET_NAME, CURRENCY_NAME
 
 router = Router()
@@ -14,41 +14,42 @@ router = Router()
 
 def _welcome_text() -> str:
     return (
-        f"🐣 <b>ربات سرگرمی جوجو</b> 🐣\n\n"
-        f"یه {DEFAULT_PET_NAME} بامزه برای گروهت...\n"
-        f"🌸 کافیه توی گروه جوجو جوجو کنی تا {CURRENCY_NAME} بگیری!\n\n"
-        f"⭐ {CURRENCY_NAME} جمع کن و با بقیه رقابت کن\n"
-        f"🐣👑 لیدربرد جوجویی رو فتح کن و سلطان جوجوها شو\n\n"
-        f"⭐ چرا جوجو؟\n"
-        f"⚡ پاسخگویی فوق‌العاده سریع\n"
+        f"⚡️ <b>ربات سرگرمی جوجویی</b>\n\n"
+        f"🐤 یه جوجه بامزه برای گروهت…\n"
+        f"کافیه توی گروه جیک جیک کنی تا جیک پوینت بگیری\n\n"
+        f"⭐️ جیک پوینت جمع کن و با بقیه رقابت کن\n"
+        f"🏆 لیدربرد جوجویی رو فتح کن و پادشاه جوجه‌ ها شو\n\n"
+        f"✨ چرا جوجویی ؟\n\n"
+        f"⚡️ پاسخگویی فوق‌ العاده سریع\n"
         f"🛠 عملکرد پایدار و بدون باگ\n"
-        f"🔔 آپدیت‌های هفتگی\n"
+        f"🔄 آپدیت‌ های هفتگی\n"
         f"👥 کامیونیتی فعال و پرانرژی\n"
         f"🚨 پشتیبانی ۲۴ ساعته\n"
-        f"🟡 کاملاً رایگان برای همه\n\n"
-        f"🐣 فقط کافیه ربات رو به گروهت اضافه کنی...\n"
-        f"🌸 بعدش شروع کنی به جوجو جوجو کردن!"
+        f"🪙 کاملاً رایگان برای همه\n\n"
+        f"🐤 کافیه ربات رو به گروهت اضافه کنی…\n"
+        f"┘─ بعدش شروع کنی به جیک جیک کردن"
     )
 
 
 def _guide_text() -> str:
     return (
         f"❓ <b>راهنمای کامل جوجو</b>\n\n"
-        f"🐣 <b>میو کردن</b>\n"
-        f"دکمه «🐣 جوجو جوجو کن» رو بزن یا تو چت خصوصی مستقیم بنویس «{DEFAULT_PET_NAME}» "
-        f"تا {CURRENCY_NAME} بگیری. هر بار میو کنی، بعد از یه مدت استراحت (که با سطح "
-        f"بالاتر کمتر میشه) دوباره می‌تونی میو کنی.\n\n"
+        f"🐣 <b>جیک کردن</b>\n"
+        f"مستقیم بنویس «{DEFAULT_PET_NAME}» تا {CURRENCY_NAME} بگیری. هر بار جیک کنی، "
+        f"بعد از یه مدت استراحت (که با سطح بالاتر کمتر میشه) دوباره می‌تونی جیک کنی.\n\n"
         f"⭐ <b>سطح و تجربه</b>\n"
-        f"هر میو، تجربه اضافه می‌کنه. با رسیدن به آستانه‌ی هر سطح، ارتقا می‌گیری و "
-        f"جایزه‌ی نقدی هم دریافت می‌کنی.\n\n"
+        f"هر جیک، تجربه اضافه می‌کنه. با رسیدن به آستانه‌ی هر سطح، ارتقا می‌گیری و "
+        f"جایزه‌ی نقدی هم دریافت می‌کنی. بنویس «سطح» تا وضعیتت رو ببینی.\n\n"
         f"🏦 <b>بانک</b>\n"
-        f"از سطح ۴ به بعد می‌تونی حساب باز کنی، پول واریز/برداشت کنی و سود روزانه بگیری.\n\n"
+        f"از سطح ۴ به بعد بنویس «بانک» تا حساب باز کنی، پول واریز/برداشت کنی و سود روزانه بگیری.\n\n"
         f"🎮 <b>بازی‌ها</b>\n"
-        f"بسکتبال، بولینگ، دارت و فوتبال - با شرط‌بندی پوینت در مقابل بقیه کاربرا.\n\n"
+        f"بنویس «بازی» - بسکتبال، بولینگ، دارت و فوتبال با شرط‌بندی پوینت در مقابل بقیه کاربرا.\n\n"
         f"🛍 <b>مارکت</b>\n"
-        f"محصولات مختلف رو با {CURRENCY_NAME} بخر (روزانه حداکثر ۵۰ عدد).\n\n"
+        f"بنویس «مارکت» و محصولات مختلف رو با {CURRENCY_NAME} بخر (روزانه حداکثر ۵۰ عدد).\n\n"
         f"🏆 <b>لیدربرد</b>\n"
-        f"ببین کی ثروتمندترین، پرفعالیت‌ترین یا بالاسطح‌ترین کاربره."
+        f"بنویس «لیدربرد» تا ببینی کی ثروتمندترین، پرفعالیت‌ترین یا بالاسطح‌ترین کاربره.\n\n"
+        f"🪪 <b>پروفایل</b>\n"
+        f"بنویس «پروفایل» تا وضعیت کامل جوجوت رو ببینی."
     )
 
 
@@ -57,28 +58,14 @@ async def cmd_start(message: Message):
     user_id = message.from_user.id
     username = message.from_user.username or message.from_user.first_name
 
-    is_new = create_user_if_not_exists(user_id, username)
+    create_user_if_not_exists(user_id, username)
     bot_info = await message.bot.get_me()
 
-    if is_new:
-        text = _welcome_text()
-        await message.answer(
-            text,
-            reply_markup=welcome_inline_kb(bot_info.username),
-            parse_mode="HTML",
-        )
-        # کیبورد اصلی رو هم جدا می‌فرستیم چون reply keyboard و inline keyboard
-        # نمیتونن رو یه پیام همزمان باشن
-        await message.answer(
-            "برای شروع، از منوی پایین استفاده کن 👇",
-            reply_markup=main_menu_kb(),
-        )
-    else:
-        user = get_user(user_id)
-        await message.answer(
-            f"سلام دوباره {user['pet_name']} 🐣 خوش برگشتی!",
-            reply_markup=main_menu_kb(),
-        )
+    await message.answer(
+        _welcome_text(),
+        reply_markup=welcome_inline_kb(bot_info.username),
+        parse_mode="HTML",
+    )
 
 
 @router.callback_query(F.data == "show_guide")
