@@ -7,7 +7,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 def main_menu_kb() -> ReplyKeyboardMarkup:
     """منوی اصلی که همیشه پایین صفحه هست"""
     kb = [
-        [KeyboardButton(text="🐾 میو میو کن")],
+        [KeyboardButton(text="🐣 جوجو جوجو کن")],
         [KeyboardButton(text="🪙 جوجو پوینت"), KeyboardButton(text="⭐ تجربه و سطح")],
         [KeyboardButton(text="🎮 بازی‌ها"), KeyboardButton(text="🏦 بانک")],
         [KeyboardButton(text="🛍 مارکت"), KeyboardButton(text="🏆 لیدربرد")],
@@ -40,7 +40,7 @@ def games_menu_kb() -> InlineKeyboardMarkup:
 def leaderboard_menu_kb() -> InlineKeyboardMarkup:
     kb = [
         [InlineKeyboardButton(text="💰 ثروتمندترین‌ها", callback_data="lb_meow_points")],
-        [InlineKeyboardButton(text="🐾 پرسر و صداترین‌ها", callback_data="lb_exp")],
+        [InlineKeyboardButton(text="🐣 پرسر و صداترین‌ها", callback_data="lb_exp")],
         [InlineKeyboardButton(text="⭐ بالاترین سطح‌ها", callback_data="lb_level")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=kb)
@@ -54,6 +54,21 @@ def admin_panel_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="✅ رفع مسدودیت", callback_data="admin_unban")],
         [InlineKeyboardButton(text="✏️ ویرایش سطح/موجودی", callback_data="admin_edit_user")],
         [InlineKeyboardButton(text="📢 پیام همگانی", callback_data="admin_broadcast")],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+def welcome_inline_kb(bot_username: str) -> InlineKeyboardMarkup:
+    """
+    دکمه‌های زیر پیام معرفی /start.
+    دکمه افزودن به گروه با startgroup کاربر رو مستقیم به فلوی افزودن ربات به گروه می‌بره.
+    """
+    kb = [
+        [InlineKeyboardButton(
+            text="➕ افزودن من به گروه",
+            url=f"https://t.me/{bot_username}?startgroup=true",
+        )],
+        [InlineKeyboardButton(text="❓ راهنمای کامل", callback_data="show_guide")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
