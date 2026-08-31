@@ -11,7 +11,7 @@ ADMIN_IDS = [
 
 DB_PATH = "jojo_bot.db"
 
-# نام پیشی و ارز پیش‌فرض
+# نام جوجو و ارز پیش‌فرض
 DEFAULT_PET_NAME = "جوجو"
 CURRENCY_NAME = "جوجو پوینت"
 CURRENCY_EMOJI = "🪙"
