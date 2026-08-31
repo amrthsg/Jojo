@@ -3,6 +3,7 @@
 
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
@@ -43,7 +44,7 @@ def _log_admin_action(admin_id: int, action: str, target_user: int | None, amoun
     conn.close()
 
 
-@router.message(F.text == "/admin")
+@router.message(Command("admin"))
 async def cmd_admin_panel(message: Message):
     if not is_admin(message.from_user.id):
         return  # سکوت کامل برای غیرادمین‌ها

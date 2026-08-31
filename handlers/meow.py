@@ -1,5 +1,5 @@
 # handlers/meow.py
-# هندلر اصلی: میو میو کن، تجربه و سطح، پروفایل
+# هندلر اصلی: جوجو جوجو کن، تجربه و سطح، پروفایل
 
 import time
 from aiogram import Router, F
@@ -26,13 +26,16 @@ from config import CURRENCY_NAME, CURRENCY_EMOJI, MAX_LEVEL
 router = Router()
 
 
-@router.message(F.text == "🐾 میو میو کن")
-async def handle_meow(message: Message):
+async def process_meow(message: Message):
+    """
+    منطق اصلی میو کردن. هم از دکمه «🐣 جوجو جوجو کن» و هم از تایپ
+    مستقیم نام جوجو (مثلاً «جوجو») صدا زده میشه.
+    """
     user_id = message.from_user.id
     user = get_user(user_id)
 
     if not user:
-        await message.answer("اول باید /start بزنی تا پیشیت ساخته بشه 🐱")
+        await message.answer("اول باید /start بزنی تا جوجوت ساخته بشه 🐤")
         return
 
     if user["is_banned"]:
@@ -47,7 +50,7 @@ async def handle_meow(message: Message):
         remaining = cooldown - elapsed
         await message.answer(
             f"😴 {user['pet_name']} هنوز خسته‌ست..\n"
-            f"⏳ بعد از {format_time(remaining)} میتونی دوباره میو میو کنی"
+            f"⏳ بعد از {format_time(remaining)} میتونی دوباره {user['pet_name']} کنی"
         )
         return
 
@@ -86,13 +89,55 @@ async def handle_meow(message: Message):
     new_cooldown = get_cooldown_seconds(new_level)
 
     text = (
-        f"وقتی صدا میزنی <b>{user['pet_name']}</b> {reward:,} {CURRENCY_NAME} گرفتی 🐾\n"
+        f"<b>{user['pet_name']}</b> {reward:,} {CURRENCY_NAME} گرفتی 🐣\n"
         f"💰 {CURRENCY_NAME} هات : {new_balance:,} {CURRENCY_EMOJI}\n"
-        f"⏳ بعد از {format_time(new_cooldown)} میتونی دوباره میو میو کنی"
+        f"⏳ بعد از {format_time(new_cooldown)} میتونی دوباره {user['pet_name']} کنی"
         f"{level_up_text}"
     )
 
     await message.answer(text, parse_mode="HTML")
+
+
+@router.message(F.text == "🐣 جوجو جوجو کن")
+async def handle_meow_button(message: Message):
+    await process_meow(message)
+
+
+def _is_pet_name_call(text: str | None) -> bool:
+    """
+    چک می‌کنه آیا متن پیام میتونه صدا زدنِ نام جوجو باشه.
+    برای جلوگیری از تداخل با دکمه‌های منو (که همه با ایموجی شروع میشن)
+    و دستورات (که با / شروع میشن) فیلتر میشه.
+    """
+    if not text:
+        return False
+    text = text.strip()
+    if text.startswith("/"):
+        return False
+    if len(text) < 1 or len(text) > 32:
+        return False
+    if any(text.startswith(prefix) for prefix in ("🐣", "🪙", "⭐", "🎮", "🏦", "🛍", "🏆", "🪪")):
+        return False
+    return True
+
+
+@router.message(F.chat.type == "private", F.text.func(_is_pet_name_call))
+async def handle_meow_by_pet_name(message: Message):
+    """
+    وقتی کاربر مستقیم اسم جوجوش رو تایپ می‌کنه (مثلاً «جوجو»)،
+    اگه دقیقاً با نام جوجوی ثبت‌شده‌ی خودش یکی باشه، همون کار دکمه میو رو انجام میده.
+
+    عمداً فقط تو چت خصوصی (private) فعاله؛ در گروه‌ها محدود میشه چون ممکنه
+    پیام‌های عادی کاربران دیگه به‌اشتباه به‌عنوان صدا زدن جوجو تفسیر بشه.
+    """
+    user = get_user(message.from_user.id)
+    if not user:
+        return  # کاربر هنوز /start نزده، این پیام رو نادیده بگیر
+
+    if message.text.strip() != user["pet_name"]:
+        return  # این پیام اسم جوجو این کاربر نیست، نادیده بگیر
+
+    await process_meow(message)
 
 
 @router.message(F.text == "⭐ تجربه و سطح")
@@ -101,7 +146,7 @@ async def handle_level_info(message: Message):
     user = get_user(user_id)
 
     if not user:
-        await message.answer("اول باید /start بزنی 🐱")
+        await message.answer("اول باید /start بزنی 🐤")
         return
 
     if user["level"] >= MAX_LEVEL:
@@ -114,7 +159,7 @@ async def handle_level_info(message: Message):
     text = (
         f"⭐ <b>سطح و تجربه {user['pet_name']}</b>\n\n"
         f"🌟 سطح فعلی: {user['level']} / {MAX_LEVEL}\n"
-        f"🐾 مجموع میو: {user['exp']:,}\n"
+        f"🐣 مجموع میو: {user['exp']:,}\n"
         f"👑 مقام: {user['rank_level']}\n\n"
         f"{exp_text}"
     )
@@ -127,7 +172,7 @@ async def handle_points_info(message: Message):
     user = get_user(user_id)
 
     if not user:
-        await message.answer("اول باید /start بزنی 🐱")
+        await message.answer("اول باید /start بزنی 🐤")
         return
 
     text = (
@@ -144,13 +189,13 @@ async def handle_profile(message: Message):
     user = get_user(user_id)
 
     if not user:
-        await message.answer("اول باید /start بزنی 🐱")
+        await message.answer("اول باید /start بزنی 🐤")
         return
 
     fill_percent = int((user["meow_points"] / user["capacity"]) * 100) if user["capacity"] else 0
 
     text = (
-        f"🐈 <b>پروفایل {user['pet_name']}</b>\n\n"
+        f"🐣 <b>پروفایل {user['pet_name']}</b>\n\n"
         f"🏷 نام: {user['pet_name']}\n"
         f"👑 مقام: {user['rank_level']}\n"
         f"⭐ سطح: {user['level']} / {MAX_LEVEL}\n\n"
@@ -172,13 +217,13 @@ async def handle_rename(message: Message):
     new_name = message.text.replace("تغییر نام ", "").strip()
 
     if not (3 <= len(new_name) <= 32):
-        await message.answer("❌ نام پیشی باید بین ۳ تا ۳۲ کاراکتر باشد.")
+        await message.answer("❌ نام جوجو باید بین ۳ تا ۳۲ کاراکتر باشد.")
         return
 
     user_id = message.from_user.id
     user = get_user(user_id)
     if not user:
-        await message.answer("اول باید /start بزنی 🐱")
+        await message.answer("اول باید /start بزنی 🐤")
         return
 
     if user["meow_points"] < RENAME_COST:
@@ -188,4 +233,4 @@ async def handle_rename(message: Message):
     add_meow_points(user_id, -RENAME_COST)
     update_pet_name(user_id, new_name)
 
-    await message.answer(f"✅ نام پیشیت به «{new_name}» تغییر کرد 🐾")
+    await message.answer(f"✅ نام جوجوت به «{new_name}» تغییر کرد 🐣")

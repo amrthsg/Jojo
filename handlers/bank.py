@@ -36,7 +36,7 @@ async def handle_bank_menu(message: Message):
     user = get_user(user_id)
 
     if not user:
-        await message.answer("اول باید /start بزنی 🐱")
+        await message.answer("اول باید /start بزنی 🐤")
         return
 
     if user["level"] < BANK_MIN_LEVEL:

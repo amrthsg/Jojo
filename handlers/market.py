@@ -1,5 +1,5 @@
 # handlers/market.py
-# مارکت میویی: خرید پیشی خیابونی، کرم ماهیگیری و غیره
+# مارکت جوجو: خرید دونه غذا، جوجوی دوقلو و غیره
 
 from datetime import date
 from aiogram import Router, F
@@ -24,8 +24,8 @@ def _seed_default_items():
             """INSERT INTO market_items (name, price, item_type, description)
                VALUES (?, ?, ?, ?)""",
             [
-                ("پیشی خیابونی", 500, "street_cat", "یک پیشی خیابونی برای نجات دادن"),
-                ("کرم ماهیگیری", 300, "bait", "ماهیگیری بدون نیاز به استراحت"),
+                ("جوجه گمشده", 500, "stray_chick", "یک جوجه‌ی تنها برای پناه دادن"),
+                ("دونه غذای طلایی", 300, "food", "افزایش سرعت میو کردن برای مدتی"),
             ],
         )
         conn.commit()
