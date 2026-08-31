@@ -1,19 +1,9 @@
 # keyboards/main_kb.py
 # کیبوردهای ثابت ربات
+# توجه: دیگه هیچ Reply Keyboard (منوی پایین صفحه) استفاده نمیشه.
+# همه‌چیز با تایپ متن (مثلاً «جوجو»، «بانک»، «مارکت») فراخوانی میشه.
 
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
-
-
-def main_menu_kb() -> ReplyKeyboardMarkup:
-    """منوی اصلی که همیشه پایین صفحه هست"""
-    kb = [
-        [KeyboardButton(text="🐣 جوجو جوجو کن")],
-        [KeyboardButton(text="🪙 جوجو پوینت"), KeyboardButton(text="⭐ تجربه و سطح")],
-        [KeyboardButton(text="🎮 بازی‌ها"), KeyboardButton(text="🏦 بانک")],
-        [KeyboardButton(text="🛍 مارکت"), KeyboardButton(text="🏆 لیدربرد")],
-        [KeyboardButton(text="🪪 پروفایل جوجو")],
-    ]
-    return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
 def bank_menu_kb() -> InlineKeyboardMarkup:
@@ -46,15 +36,21 @@ def leaderboard_menu_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
-def admin_panel_kb() -> InlineKeyboardMarkup:
+def admin_panel_kb(is_owner: bool = False) -> InlineKeyboardMarkup:
     kb = [
         [InlineKeyboardButton(text="🎁 اهدای پوینت به کاربر", callback_data="admin_gift")],
         [InlineKeyboardButton(text="📊 آمار کلی ربات", callback_data="admin_stats")],
         [InlineKeyboardButton(text="🚫 مسدود کردن کاربر", callback_data="admin_ban")],
         [InlineKeyboardButton(text="✅ رفع مسدودیت", callback_data="admin_unban")],
+        [InlineKeyboardButton(text="🔒 زندانی کردن کاربر", callback_data="admin_jail")],
+        [InlineKeyboardButton(text="🔓 آزاد کردن از زندان", callback_data="admin_unjail")],
         [InlineKeyboardButton(text="✏️ ویرایش سطح/موجودی", callback_data="admin_edit_user")],
         [InlineKeyboardButton(text="📢 پیام همگانی", callback_data="admin_broadcast")],
     ]
+    if is_owner:
+        kb.append([InlineKeyboardButton(text="👑 افزودن ادمین", callback_data="owner_add_admin")])
+        kb.append([InlineKeyboardButton(text="👑 حذف ادمین", callback_data="owner_remove_admin")])
+        kb.append([InlineKeyboardButton(text="📋 لیست ادمین‌ها", callback_data="owner_list_admins")])
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
