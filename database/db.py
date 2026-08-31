@@ -24,7 +24,7 @@ def init_db():
     conn = get_connection()
     cur = conn.cursor()
 
-    # جدول اصلی کاربران / پیشی‌ها
+    # جدول اصلی کاربران / جوجوها
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,

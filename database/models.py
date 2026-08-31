@@ -20,7 +20,7 @@ def get_user(user_id: int):
 
 def create_user_if_not_exists(user_id: int, username: str | None):
     """
-    اگه کاربر تازه‌ست، پیشی جدید براش می‌سازه.
+    اگه کاربر تازه‌ست، جوجوی جدید براش می‌سازه.
     خروجی: True اگه تازه ساخته شد، False اگه از قبل بود.
     """
     user = get_user(user_id)
