@@ -140,4 +140,24 @@ def init_db():
     """)
 
     conn.commit()
+
+    # ---------------- Migration خودکار ----------------
+    # CREATE TABLE IF NOT EXISTS فقط جدول رو میسازه اگه وجود نداشته باشه،
+    # اما اگه جدول از قبل (نسخه‌ی قدیمی‌تر) وجود داشته باشه، ستون‌های جدید
+    # رو اضافه نمیکنه. این بخش هر ستون جدیدی که در آپدیت‌های بعدی اضافه شده
+    # رو چک میکنه و اگه نبود، اضافه‌ش میکنه - بدون نیاز به پاک کردن دیتابیس.
+    _add_column_if_missing(conn, "users", "is_jailed", "INTEGER DEFAULT 0")
+
+    conn.commit()
     conn.close()
+
+
+def _add_column_if_missing(conn, table: str, column: str, definition: str):
+    """
+    اگه ستون column تو جدول table وجود نداشته باشه، اضافه‌ش میکنه.
+    برای migration امن روی دیتابیس‌های قدیمی‌تر بدون پاک کردن داده‌ها.
+    """
+    existing_columns = [row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+    if column not in existing_columns:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
