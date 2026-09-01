@@ -1,5 +1,6 @@
 # handlers/start.py
 # هندلر /start - ساخت کاربر جدید، پیام معرفی و راهنما
+# تنها دکمه‌ی باقی‌مونده «افزودن به گروه» است چون یک لینک خارجی است، نه اکشن داخلی ربات.
 
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
@@ -7,7 +8,7 @@ from aiogram.filters import CommandStart
 
 from database.models import create_user_if_not_exists, get_user
 from keyboards.main_kb import welcome_inline_kb
-from config import DEFAULT_PET_NAME, CURRENCY_NAME
+from config import CURRENCY_NAME
 
 router = Router()
 
@@ -35,7 +36,7 @@ def _guide_text() -> str:
     return (
         f"❓ <b>راهنمای کامل جوجو</b>\n\n"
         f"🐣 <b>جیک کردن</b>\n"
-        f"مستقیم بنویس «{DEFAULT_PET_NAME}» تا {CURRENCY_NAME} بگیری. هر بار جیک کنی، "
+        f"بنویس «جیک جیک» تا {CURRENCY_NAME} بگیری. هر بار جیک کنی، "
         f"بعد از یه مدت استراحت (که با سطح بالاتر کمتر میشه) دوباره می‌تونی جیک کنی.\n\n"
         f"⭐ <b>سطح و تجربه</b>\n"
         f"هر جیک، تجربه اضافه می‌کنه. با رسیدن به آستانه‌ی هر سطح، ارتقا می‌گیری و "
@@ -66,6 +67,11 @@ async def cmd_start(message: Message):
         reply_markup=welcome_inline_kb(bot_info.username),
         parse_mode="HTML",
     )
+
+
+@router.message(F.text == "راهنما")
+async def handle_guide_text(message: Message):
+    await message.answer(_guide_text(), parse_mode="HTML")
 
 
 @router.callback_query(F.data == "show_guide")

@@ -1,8 +1,8 @@
 # handlers/bank.py
-# هندلر بخش بانک جوجو
+# هندلر بخش بانک جوجو - کاملاً متنی، بدون هیچ دکمه‌ای
 
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
@@ -17,7 +17,6 @@ from database.bank_models import (
     calculate_transfer_fee,
     change_card_number,
 )
-from keyboards.main_kb import bank_menu_kb
 from config import BANK_MIN_LEVEL, BANK_ACCOUNT_OPEN_COST, CURRENCY_EMOJI, CARD_NUMBER_CHANGE_COST
 
 router = Router()
@@ -30,7 +29,18 @@ class BankStates(StatesGroup):
     waiting_transfer_amount = State()
 
 
-@router.message(F.text.in_({"بانک", "🏦 بانک"}))
+def _bank_help_text() -> str:
+    return (
+        "🏦 <b>راهنمای بانک</b>\n\n"
+        "بنویس «بانک» برای دیدن موجودی\n"
+        "بنویس «واریز {مبلغ}» مثلاً: واریز 500\n"
+        "بنویس «برداشت {مبلغ}» مثلاً: برداشت 500\n"
+        "بنویس «انتقال {شماره حساب} {مبلغ}»\n"
+        "بنویس «تغییر شماره حساب»"
+    )
+
+
+@router.message(F.text == "بانک")
 async def handle_bank_menu(message: Message):
     user_id = message.from_user.id
     user = get_user(user_id)
@@ -55,7 +65,8 @@ async def handle_bank_menu(message: Message):
         add_meow_points(user_id, -BANK_ACCOUNT_OPEN_COST)
         card_number = open_bank_account(user_id)
         await message.answer(
-            f"🎉 حساب بانکی باز شد!\n💳 شماره حساب شما: <code>{card_number}</code>",
+            f"🎉 حساب بانکی باز شد!\n💳 شماره حساب شما: <code>{card_number}</code>\n\n"
+            f"{_bank_help_text()}",
             parse_mode="HTML",
         )
         return
@@ -69,114 +80,76 @@ async def handle_bank_menu(message: Message):
         f"💰 موجودی: {account['balance']:,} {CURRENCY_EMOJI}\n"
     )
     if interest:
-        text += f"\n🎉 سود روزانه {interest:,} {CURRENCY_EMOJI} به حسابت اضافه شد!"
+        text += f"\n🎉 سود روزانه {interest:,} {CURRENCY_EMOJI} به حسابت اضافه شد!\n"
 
-    await message.answer(text, reply_markup=bank_menu_kb(), parse_mode="HTML")
+    text += f"\n{_bank_help_text()}"
 
-
-@router.callback_query(F.data == "bank_balance")
-async def cb_bank_balance(callback: CallbackQuery):
-    account = get_bank_account(callback.from_user.id)
-    if not account:
-        await callback.answer("حساب بانکی نداری", show_alert=True)
-        return
-    await callback.answer(f"موجودی: {account['balance']:,} {CURRENCY_EMOJI}", show_alert=True)
+    await message.answer(text, parse_mode="HTML")
 
 
-@router.callback_query(F.data == "bank_deposit")
-async def cb_bank_deposit(callback: CallbackQuery, state: FSMContext):
-    await callback.message.answer("💰 چه مقدار می‌خوای به بانک واریز کنی؟ (فقط عدد بفرست)")
-    await state.set_state(BankStates.waiting_deposit_amount)
-    await callback.answer()
-
-
-@router.message(BankStates.waiting_deposit_amount)
-async def process_deposit(message: Message, state: FSMContext):
-    if not message.text.isdigit():
-        await message.answer("❌ لطفاً فقط عدد بفرست.")
-        return
-
-    amount = int(message.text)
+@router.message(F.text.regexp(r"^واریز\s+(\d+)$"))
+async def handle_deposit_command(message: Message):
+    amount = int(message.text.split()[1])
     user = get_user(message.from_user.id)
+
+    if not user:
+        await message.answer("اول باید /start بزنی 🐤")
+        return
+
+    account = get_bank_account(message.from_user.id)
+    if not account:
+        await message.answer("❌ اول باید بنویسی «بانک» تا حساب باز کنی.")
+        return
 
     if amount <= 0 or amount > user["meow_points"]:
         await message.answer("❌ موجودی کافی نیست.")
-        await state.clear()
         return
 
     deposit_to_bank(message.from_user.id, amount)
     await message.answer(f"✅ {amount:,} {CURRENCY_EMOJI} به بانک واریز شد.")
-    await state.clear()
 
 
-@router.callback_query(F.data == "bank_withdraw")
-async def cb_bank_withdraw(callback: CallbackQuery, state: FSMContext):
-    await callback.message.answer("💸 چه مقدار می‌خوای از بانک برداشت کنی؟ (فقط عدد بفرست)")
-    await state.set_state(BankStates.waiting_withdraw_amount)
-    await callback.answer()
-
-
-@router.message(BankStates.waiting_withdraw_amount)
-async def process_withdraw(message: Message, state: FSMContext):
-    if not message.text.isdigit():
-        await message.answer("❌ لطفاً فقط عدد بفرست.")
-        return
-
-    amount = int(message.text)
+@router.message(F.text.regexp(r"^برداشت\s+(\d+)$"))
+async def handle_withdraw_command(message: Message):
+    amount = int(message.text.split()[1])
     account = get_bank_account(message.from_user.id)
 
-    if not account or amount <= 0 or amount > account["balance"]:
+    if not account:
+        await message.answer("❌ اول باید بنویسی «بانک» تا حساب باز کنی.")
+        return
+
+    if amount <= 0 or amount > account["balance"]:
         await message.answer("❌ موجودی بانک کافی نیست.")
-        await state.clear()
         return
 
     withdraw_from_bank(message.from_user.id, amount)
     await message.answer(f"✅ {amount:,} {CURRENCY_EMOJI} از بانک برداشت شد.")
-    await state.clear()
 
 
-@router.callback_query(F.data == "bank_transfer")
-async def cb_bank_transfer(callback: CallbackQuery, state: FSMContext):
-    await callback.message.answer("💳 شماره حساب مقصد رو بفرست:")
-    await state.set_state(BankStates.waiting_transfer_card)
-    await callback.answer()
+@router.message(F.text.regexp(r"^انتقال\s+(\S+)\s+(\d+)$"))
+async def handle_transfer_command(message: Message):
+    parts = message.text.split()
+    to_card = parts[1]
+    amount = int(parts[2])
 
-
-@router.message(BankStates.waiting_transfer_card)
-async def process_transfer_card(message: Message, state: FSMContext):
-    await state.update_data(to_card=message.text.strip())
-    await message.answer("💰 حالا مبلغ انتقال رو بفرست:")
-    await state.set_state(BankStates.waiting_transfer_amount)
-
-
-@router.message(BankStates.waiting_transfer_amount)
-async def process_transfer_amount(message: Message, state: FSMContext):
-    if not message.text.isdigit():
-        await message.answer("❌ لطفاً فقط عدد بفرست.")
+    account = get_bank_account(message.from_user.id)
+    if not account:
+        await message.answer("❌ اول باید بنویسی «بانک» تا حساب باز کنی.")
         return
-
-    amount = int(message.text)
-    data = await state.get_data()
-    to_card = data.get("to_card")
 
     fee = calculate_transfer_fee(amount)
     success, msg = card_to_card_transfer(message.from_user.id, to_card, amount)
 
     if success:
-        await message.answer(
-            f"✅ {amount:,} {CURRENCY_EMOJI} با کارمزد {fee:,} انتقال یافت."
-        )
+        await message.answer(f"✅ {amount:,} {CURRENCY_EMOJI} با کارمزد {fee:,} انتقال یافت.")
     else:
         await message.answer(f"❌ {msg}")
 
-    await state.clear()
 
-
-@router.callback_query(F.data == "bank_change_number")
-async def cb_change_card_number(callback: CallbackQuery):
-    success, msg, new_number = change_card_number(callback.from_user.id, CARD_NUMBER_CHANGE_COST)
+@router.message(F.text == "تغییر شماره حساب")
+async def handle_change_card_number(message: Message):
+    success, msg, new_number = change_card_number(message.from_user.id, CARD_NUMBER_CHANGE_COST)
     if success:
-        await callback.message.answer(f"✅ شماره حساب جدید: <code>{new_number}</code>", parse_mode="HTML")
+        await message.answer(f"✅ شماره حساب جدید: <code>{new_number}</code>", parse_mode="HTML")
     else:
-        await callback.message.answer(f"❌ {msg}")
-    await callback.answer()
+        await message.answer(f"❌ {msg}")

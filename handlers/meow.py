@@ -1,6 +1,6 @@
 # handlers/meow.py
-# هندلر اصلی: جیک کردن (با نوشتن اسم جوجو)، تجربه و سطح، پروفایل
-# توجه: هیچ دکمه‌ای اینجا نیست، همه‌چیز با تایپ متن فراخوانی میشه.
+# هندلر اصلی: جیک کردن (با تایپ کلمه «جیک جیک»)، تجربه و سطح، پروفایل
+# هیچ دکمه‌ای اینجا نیست، همه‌چیز با تایپ متن فراخوانی میشه.
 
 import time
 from aiogram import Router, F
@@ -22,14 +22,16 @@ from utils.leveling import (
     get_capacity_for_rank,
     format_time,
 )
-from config import CURRENCY_NAME, CURRENCY_EMOJI, MAX_LEVEL, DEFAULT_PET_NAME
+from config import CURRENCY_NAME, CURRENCY_EMOJI, MAX_LEVEL
 
 router = Router()
+
+JIK_TRIGGER = "جیک جیک"
 
 
 async def process_meow(message: Message):
     """
-    منطق اصلی جیک کردن. با تایپ مستقیم نام جوجو (مثلاً «جوجو») صدا زده میشه.
+    منطق اصلی جیک کردن. فقط با تایپ دقیق کلمه «جیک جیک» صدا زده میشه.
     """
     user_id = message.from_user.id
     user = get_user(user_id)
@@ -54,7 +56,7 @@ async def process_meow(message: Message):
         remaining = cooldown - elapsed
         await message.answer(
             f"😴 {user['pet_name']} هنوز خسته‌ست..\n"
-            f"⏳ بعد از {format_time(remaining)} میتونی دوباره {user['pet_name']} کنی"
+            f"⏳ بعد از {format_time(remaining)} میتونی دوباره جیک جیک کنی"
         )
         return
 
@@ -94,52 +96,18 @@ async def process_meow(message: Message):
     text = (
         f"<b>{user['pet_name']}</b> {reward:,} {CURRENCY_NAME} گرفتی 🐤\n"
         f"💰 {CURRENCY_NAME} هات : {new_balance:,} {CURRENCY_EMOJI}\n"
-        f"⏳ بعد از {format_time(new_cooldown)} میتونی دوباره {user['pet_name']} کنی"
+        f"⏳ بعد از {format_time(new_cooldown)} میتونی دوباره جیک جیک کنی"
         f"{level_up_text}"
     )
 
     await message.answer(text, parse_mode="HTML")
 
 
-def _is_pet_name_call(text: str | None) -> bool:
+@router.message(F.text == JIK_TRIGGER)
+async def handle_jik_jik(message: Message):
     """
-    چک می‌کنه آیا متن پیام میتونه صدا زدنِ نام جوجو باشه.
-    فقط رشته‌های کوتاه و بدون / رو قبول می‌کنه.
-    """
-    if not text:
-        return False
-    text = text.strip()
-    if text.startswith("/"):
-        return False
-    if len(text) < 1 or len(text) > 32:
-        return False
-    return True
-
-
-@router.message(F.chat.type == "private", F.text.func(_is_pet_name_call))
-async def handle_meow_by_pet_name(message: Message):
-    """
-    وقتی کاربر مستقیم اسم جوجوش رو تایپ می‌کنه (مثلاً «جوجو»)،
-    اگه دقیقاً با نام جوجوی ثبت‌شده‌ی خودش یکی باشه، جیک کردن انجام میشه.
-
-    عمداً فقط تو چت خصوصی (private) فعاله؛ تو گروه‌ها هندلر جدا
-    (handle_meow_in_group) این کار رو با محدودیت بیشتر انجام میده.
-    """
-    user = get_user(message.from_user.id)
-    if not user:
-        return
-
-    if message.text.strip() != user["pet_name"]:
-        return
-
-    await process_meow(message)
-
-
-@router.message(F.chat.type.in_({"group", "supergroup"}), F.text == DEFAULT_PET_NAME)
-async def handle_meow_in_group(message: Message):
-    """
-    تو گروه‌ها، فقط وقتی دقیقاً نام پیش‌فرض «جوجو» نوشته بشه فعال میشه
-    (نه هر اسم دلخواهی) تا با پیام‌های عادی گروه تداخل نکنه.
+    محرک اصلی: کاربر باید دقیقاً کلمه «جیک جیک» رو تایپ کنه تا پوینت بگیره.
+    هم تو چت خصوصی هم تو گروه فعاله.
     """
     await process_meow(message)
 
