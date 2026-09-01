@@ -3,7 +3,7 @@
 # تنها دکمه‌ی باقی‌مونده «افزودن به گروه» است چون یک لینک خارجی است، نه اکشن داخلی ربات.
 
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.filters import CommandStart
 
 from database.models import create_user_if_not_exists, get_user
@@ -62,6 +62,12 @@ async def cmd_start(message: Message):
     create_user_if_not_exists(user_id, username)
     bot_info = await message.bot.get_me()
 
+    # اگه از نسخه‌های قدیمی‌تر ربات، یه Reply Keyboard (منوی پایین صفحه)
+    # قبلاً برای این چت فرستاده شده بود، تلگرام تا وقتی صریحاً دستور حذف
+    # نده اون رو نگه می‌داره، حتی اگه دیگه هیچ‌جا reply_markup نفرستیم.
+    # این پیام کوتاه فقط برای حذف اون کیبورد قدیمی‌ست.
+    await message.answer("🐤", reply_markup=ReplyKeyboardRemove())
+
     await message.answer(
         _welcome_text(),
         reply_markup=welcome_inline_kb(bot_info.username),
@@ -72,6 +78,15 @@ async def cmd_start(message: Message):
 @router.message(F.text == "راهنما")
 async def handle_guide_text(message: Message):
     await message.answer(_guide_text(), parse_mode="HTML")
+
+
+@router.message(F.text == "پاک کردن منو")
+async def handle_clear_menu(message: Message):
+    """
+    دستور کمکی برای کاربرانی که هنوز کیبورد قدیمی (منوی پایین صفحه)
+    از نسخه‌های قبلی ربات براشون مونده و /start دوباره نمیزنن.
+    """
+    await message.answer("✅ منوی قدیمی پاک شد.", reply_markup=ReplyKeyboardRemove())
 
 
 @router.callback_query(F.data == "show_guide")
