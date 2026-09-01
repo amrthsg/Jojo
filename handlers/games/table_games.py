@@ -1,15 +1,13 @@
 # handlers/games/table_games.py
-# منطق بازی‌های میزی: بسکتبال، بولینگ، دارت، فوتبال
+# منطق بازی‌های میزی: بسکتبال، بولینگ، دارت، فوتبال - کاملاً متنی بدون دکمه
 # دو نفره، شرط‌بندی پوینت، برنده کل میز رو میبره، مساوی = برگشت پول
 
+import re
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import Message
 
 from database.models import get_user, add_meow_points
 from database.db import get_connection
-from keyboards.main_kb import games_menu_kb
 from config import GAME_TYPES, GAMES_MIN_LEVEL, GAMES_TABLE_MIN_LEVEL
 
 router = Router()
@@ -21,12 +19,15 @@ GAME_NAMES_FA = {
     "football": "فوتبال",
 }
 
+# نگاشت اسم فارسی به کلید داخلی بازی
+GAME_NAME_TO_KEY = {v: k for k, v in GAME_NAMES_FA.items()}
 
-class GameStates(StatesGroup):
-    waiting_bet_amount = State()
+BET_PATTERN = re.compile(
+    r"^بازی\s+(بسکتبال|بولینگ|دارت|فوتبال)\s+(\d+)$"
+)
 
 
-@router.message(F.text.in_({"بازی", "بازیها", "بازی‌ها", "🎮 بازی‌ها"}))
+@router.message(F.text == "بازی")
 async def handle_games_menu(message: Message):
     user = get_user(message.from_user.id)
     if not user:
@@ -42,47 +43,37 @@ async def handle_games_menu(message: Message):
         return
 
     await message.answer(
-        "🎮 <b>بازی‌های جوجو</b>\n\nیکی از بازی‌ها رو انتخاب کن:",
-        reply_markup=games_menu_kb(),
+        "🎮 <b>بازی‌های جوجو</b>\n\n"
+        "🏀 بسکتبال 🎳 بولینگ 🎯 دارت ⚽ فوتبال\n\n"
+        "برای ساخت میز بنویس: «بازی {نوع بازی} {مبلغ شرط}»\n"
+        "مثلاً: بازی بسکتبال 500",
         parse_mode="HTML",
     )
 
 
-@router.callback_query(F.data.startswith("game_"))
-async def cb_select_game(callback: CallbackQuery, state: FSMContext):
-    game_type = callback.data.replace("game_", "")
+@router.message(F.text.regexp(BET_PATTERN))
+async def handle_create_table(message: Message):
+    match = BET_PATTERN.match(message.text)
+    game_name_fa = match.group(1)
+    amount = int(match.group(2))
+    game_type = GAME_NAME_TO_KEY[game_name_fa]
 
-    user = get_user(callback.from_user.id)
-    if user["level"] < GAMES_TABLE_MIN_LEVEL:
-        await callback.answer(
-            f"برای ساخت میز بازی باید حداقل سطح {GAMES_TABLE_MIN_LEVEL} باشی", show_alert=True
-        )
-        return
-
-    await state.update_data(game_type=game_type)
-    await callback.message.answer(
-        f"{GAME_TYPES[game_type]} چه مقدار {'' } میخوای شرط ببندی؟ (فقط عدد بفرست)"
-    )
-    await state.set_state(GameStates.waiting_bet_amount)
-    await callback.answer()
-
-
-@router.message(GameStates.waiting_bet_amount)
-async def process_bet_amount(message: Message, state: FSMContext):
-    if not message.text.isdigit():
-        await message.answer("❌ فقط عدد بفرست.")
-        return
-
-    amount = int(message.text)
     user = get_user(message.from_user.id)
+    if not user:
+        await message.answer("اول باید /start بزنی 🐤")
+        return
+
+    if user["is_jailed"]:
+        await message.answer("🔒 جوجوت زندانیه، نمی‌تونی بازی کنی.")
+        return
+
+    if user["level"] < GAMES_TABLE_MIN_LEVEL:
+        await message.answer(f"برای ساخت میز بازی باید حداقل سطح {GAMES_TABLE_MIN_LEVEL} باشی.")
+        return
 
     if amount <= 0 or amount > user["meow_points"]:
         await message.answer("❌ موجودی کافی نیست.")
-        await state.clear()
         return
-
-    data = await state.get_data()
-    game_type = data["game_type"]
 
     # کسر پول از سازنده میز و رزرو اون تا وقتی بازی تموم بشه
     add_meow_points(message.from_user.id, -amount)
@@ -102,11 +93,10 @@ async def process_bet_amount(message: Message, state: FSMContext):
     conn.close()
 
     await message.answer(
-        f"🎲 میز {GAME_NAMES_FA[game_type]} با شرط {amount:,} ساخته شد!\n"
+        f"🎲 میز {game_name_fa} با شرط {amount:,} ساخته شد!\n"
         f"برای پیوستن بنویس: <code>پیوستن {table_id}</code>",
         parse_mode="HTML",
     )
-    await state.clear()
 
 
 @router.message(F.text.startswith("پیوستن "))
