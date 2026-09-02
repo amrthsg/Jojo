@@ -60,14 +60,9 @@ async def process_meow(message: Message):
         )
         return
 
-    # محاسبه پاداش
+    # محاسبه پاداش (بدون محدودیت سقف ظرفیت)
     reward = perform_meow(user["level"])
-
-    # چک ظرفیت (شکم/جیب)
     new_balance = user["meow_points"] + reward
-    if new_balance > user["capacity"]:
-        reward = max(0, user["capacity"] - user["meow_points"])
-        new_balance = user["capacity"]
 
     add_meow_points(user_id, reward)
     add_exp(user_id, 1)
@@ -150,7 +145,6 @@ async def handle_points_info(message: Message):
     text = (
         f"💰 <b>{CURRENCY_NAME} های {user['pet_name']}</b>\n\n"
         f"🪙 موجودی: {user['meow_points']:,} {CURRENCY_EMOJI}\n"
-        f"🎒 ظرفیت: {user['capacity']:,} {CURRENCY_EMOJI}\n"
     )
     await message.answer(text, parse_mode="HTML")
 
@@ -164,15 +158,12 @@ async def handle_profile(message: Message):
         await message.answer("اول باید /start بزنی 🐤")
         return
 
-    fill_percent = int((user["meow_points"] / user["capacity"]) * 100) if user["capacity"] else 0
-
     text = (
         f"🐤 <b>پروفایل {user['pet_name']}</b>\n\n"
         f"🏷 نام: {user['pet_name']}\n"
         f"👑 مقام: {user['rank_level']}\n"
         f"⭐ سطح: {user['level']} / {MAX_LEVEL}\n\n"
         f"🪙 موجودی: {user['meow_points']:,} {CURRENCY_EMOJI}\n"
-        f"🎒 ظرفیت پر شده: {fill_percent}%\n"
     )
     await message.answer(text, parse_mode="HTML")
 
