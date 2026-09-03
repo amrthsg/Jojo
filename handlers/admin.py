@@ -110,6 +110,45 @@ def _resolve_target(message: Message, args: list[str]) -> int | None:
     return None
 
 
+@router.message(F.text.regexp(r"^اهدا\s+همه\s+(.+)$"))
+async def handle_gift_all(message: Message):
+    """
+    اهدای پوینت به همه کاربران فعال (غیربن) به‌صورت یکجا.
+    فرمت: اهدا همه {مبلغ} - مبلغ میتونه با پسوند k/m/کک هم باشه.
+    """
+    if not is_admin(message.from_user.id):
+        return
+
+    from utils.amount_parser import parse_amount
+
+    amount_str = message.text.split()[2]  # بعد از "اهدا" و "همه"
+    amount = parse_amount(amount_str)
+
+    if amount is None or amount <= 0:
+        await message.answer("❌ مبلغ نامعتبره. مثال: اهدا همه 100 یا اهدا همه 1k")
+        return
+
+    if amount > ADMIN_GIFT_MAX_AMOUNT:
+        await message.answer(f"❌ حداکثر مقدار مجاز {ADMIN_GIFT_MAX_AMOUNT:,} است.")
+        return
+
+    conn = get_connection()
+    users = conn.execute("SELECT user_id FROM users WHERE is_banned = 0").fetchall()
+    conn.close()
+
+    for user in users:
+        add_meow_points(user["user_id"], amount)
+
+    _log_admin_action(message.from_user.id, "gift_all", None, amount, note=f"به {len(users)} کاربر")
+    await message.answer(f"✅ {amount:,} {CURRENCY_EMOJI} به همه‌ی {len(users):,} کاربر اهدا شد.")
+
+    for user in users:
+        try:
+            await message.bot.send_message(user["user_id"], f"🎁 ادمین {amount:,} {CURRENCY_EMOJI} به همه هدیه داد، شامل تو هم شد!")
+        except Exception:
+            pass
+
+
 @router.message(F.text.startswith("اهدا "))
 async def handle_gift(message: Message):
     if not is_admin(message.from_user.id):

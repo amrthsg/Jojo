@@ -22,7 +22,8 @@ from utils.leveling import (
     get_capacity_for_rank,
     format_time,
 )
-from config import CURRENCY_NAME, CURRENCY_EMOJI, MAX_LEVEL
+from config import CURRENCY_NAME, CURRENCY_EMOJI, MAX_LEVEL, TRANSFER_MIN_AMOUNT, TRANSFER_MAX_AMOUNT, TRANSFER_MIN_LEVEL
+from utils.amount_parser import parse_amount
 
 router = Router()
 
@@ -60,14 +61,9 @@ async def process_meow(message: Message):
         )
         return
 
-    # محاسبه پاداش
+    # محاسبه پاداش (بدون محدودیت سقف ظرفیت)
     reward = perform_meow(user["level"])
-
-    # چک ظرفیت (شکم/جیب)
     new_balance = user["meow_points"] + reward
-    if new_balance > user["capacity"]:
-        reward = max(0, user["capacity"] - user["meow_points"])
-        new_balance = user["capacity"]
 
     add_meow_points(user_id, reward)
     add_exp(user_id, 1)
@@ -150,7 +146,6 @@ async def handle_points_info(message: Message):
     text = (
         f"💰 <b>{CURRENCY_NAME} های {user['pet_name']}</b>\n\n"
         f"🪙 موجودی: {user['meow_points']:,} {CURRENCY_EMOJI}\n"
-        f"🎒 ظرفیت: {user['capacity']:,} {CURRENCY_EMOJI}\n"
     )
     await message.answer(text, parse_mode="HTML")
 
@@ -164,16 +159,30 @@ async def handle_profile(message: Message):
         await message.answer("اول باید /start بزنی 🐤")
         return
 
-    fill_percent = int((user["meow_points"] / user["capacity"]) * 100) if user["capacity"] else 0
+    tg_user = message.from_user
+    full_name = tg_user.full_name  # ترکیب first_name و last_name تلگرام
+    username_line = f"🔗 @{tg_user.username}\n" if tg_user.username else ""
 
     text = (
+        f"👤 <b>{full_name}</b>\n"
+        f"{username_line}\n"
         f"🐤 <b>پروفایل {user['pet_name']}</b>\n\n"
-        f"🏷 نام: {user['pet_name']}\n"
+        f"🏷 نام جوجو: {user['pet_name']}\n"
         f"👑 مقام: {user['rank_level']}\n"
         f"⭐ سطح: {user['level']} / {MAX_LEVEL}\n\n"
         f"🪙 موجودی: {user['meow_points']:,} {CURRENCY_EMOJI}\n"
-        f"🎒 ظرفیت پر شده: {fill_percent}%\n"
     )
+
+    # تلاش برای گرفتن عکس پروفایل واقعی تلگرام کاربر و فرستادن به همراه متن
+    try:
+        photos = await message.bot.get_user_profile_photos(user_id, limit=1)
+        if photos.total_count > 0:
+            photo_file_id = photos.photos[0][-1].file_id  # بزرگترین سایز عکس
+            await message.answer_photo(photo_file_id, caption=text, parse_mode="HTML")
+            return
+    except Exception:
+        pass  # اگه عکس نداشت یا خطا داد، فقط متن رو میفرستیم
+
     await message.answer(text, parse_mode="HTML")
 
 
@@ -205,3 +214,68 @@ async def handle_rename(message: Message):
     update_pet_name(user_id, new_name)
 
     await message.answer(f"✅ نام جوجوت به «{new_name}» تغییر کرد 🐤")
+
+
+@router.message(F.text.startswith("انتقال جیک "))
+async def handle_transfer_jik(message: Message):
+    """
+    فرمت: باید روی پیام کاربر مقصد ریپلای کنی و بنویسی «انتقال جیک {مقدار}»
+    مقدار میتونه با پسوند k/m/کک هم باشه، مثلاً: انتقال جیک 5k
+    """
+    if not message.reply_to_message:
+        await message.answer("❌ باید روی پیام کاربر مقصد ریپلای کنی و بنویسی «انتقال جیک {مبلغ}»")
+        return
+
+    to_user_id = message.reply_to_message.from_user.id
+    from_user_id = message.from_user.id
+
+    if to_user_id == from_user_id:
+        await message.answer("❌ نمیتونی به خودت انتقال بدی.")
+        return
+
+    amount_str = message.text.replace("انتقال جیک ", "", 1).strip()
+    amount = parse_amount(amount_str)
+
+    if amount is None or amount <= 0:
+        await message.answer("❌ مبلغ نامعتبره. مثال درست: انتقال جیک 500 یا انتقال جیک 5k")
+        return
+
+    if amount < TRANSFER_MIN_AMOUNT:
+        await message.answer(f"❌ حداقل مبلغ انتقال {TRANSFER_MIN_AMOUNT:,} {CURRENCY_EMOJI} است.")
+        return
+
+    if amount > TRANSFER_MAX_AMOUNT:
+        await message.answer(f"❌ حداکثر مبلغ انتقال {TRANSFER_MAX_AMOUNT:,} {CURRENCY_EMOJI} است.")
+        return
+
+    from_user = get_user(from_user_id)
+    if not from_user:
+        await message.answer("اول باید /start بزنی 🐤")
+        return
+
+    if from_user["level"] < TRANSFER_MIN_LEVEL:
+        await message.answer(f"❌ برای انتقال جیک پوینت باید حداقل سطح {TRANSFER_MIN_LEVEL} باشی.")
+        return
+
+    if not get_user(to_user_id):
+        await message.answer("❌ کاربر مقصد هنوز /start نزده.")
+        return
+
+    if from_user["meow_points"] < amount:
+        await message.answer("❌ موجودی کافی نداری.")
+        return
+
+    add_meow_points(from_user_id, -amount)
+    add_meow_points(to_user_id, amount)
+
+    await message.answer(
+        f"✅ {amount:,} {CURRENCY_EMOJI} به {message.reply_to_message.from_user.full_name} انتقال یافت."
+    )
+
+    try:
+        await message.bot.send_message(
+            to_user_id,
+            f"💰 {amount:,} {CURRENCY_EMOJI} از طرف {message.from_user.full_name} برات ارسال شد!",
+        )
+    except Exception:
+        pass
