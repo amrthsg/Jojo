@@ -23,6 +23,7 @@ from database.db import init_db, get_connection
 from database import models
 from database import bank_models
 from utils import leveling
+from utils import amount_parser
 
 PASS = "✅"
 FAIL = "❌"
@@ -233,6 +234,83 @@ def run_tests():
     print("\n--- توابع کمکی ---")
     formatted = leveling.format_time(125)
     check("فرمت زمان mm:ss درست است", formatted == "2:05", f"مقدار: {formatted}")
+
+    # ---------------- ۱۴. پارسر مقادیر عددی (انتقال جیک) ----------------
+    print("\n--- پارسر مقادیر (k/m/کک) ---")
+    check("پارس عدد ساده", amount_parser.parse_amount("500") == 500)
+    check("پارس با پسوند k", amount_parser.parse_amount("5k") == 5000)
+    check("پارس با پسوند m", amount_parser.parse_amount("2m") == 2_000_000)
+    check("پارس با پسوند کک", amount_parser.parse_amount("3کک") == 3_000_000)
+    check("پارس عدد اعشاری با پسوند", amount_parser.parse_amount("1.5k") == 1500)
+    check("پارس رشته نامعتبر برمی‌گرداند None", amount_parser.parse_amount("abc") is None)
+    check("پارس رشته خالی برمی‌گرداند None", amount_parser.parse_amount("") is None)
+
+    # ---------------- ۱۵. شمارنده پیام گروه و آیتم شانسی ----------------
+    print("\n--- شمارنده پیام گروه (آیتم شانسی) ---")
+
+    TEST_CHAT_ID = -100123456
+    spawn_triggered = False
+    for i in range(config.CHANCE_SPAWN_MESSAGE_INTERVAL):
+        spawn_triggered = models.increment_group_message_count(
+            TEST_CHAT_ID, config.CHANCE_SPAWN_MESSAGE_INTERVAL
+        )
+    check(
+        f"بعد از {config.CHANCE_SPAWN_MESSAGE_INTERVAL} پیام، آیتم شانسی فعال می‌شود",
+        spawn_triggered is True,
+    )
+
+    conn = get_connection()
+    counter_row = conn.execute(
+        "SELECT message_count FROM group_message_counters WHERE chat_id = ?", (TEST_CHAT_ID,)
+    ).fetchone()
+    conn.close()
+    check("شمارنده بعد از رسیدن به آستانه صفر می‌شود", counter_row["message_count"] == 0)
+
+    # ---------------- ۱۶. اهدای همگانی (منطق پایه) ----------------
+    print("\n--- اهدای همگانی ---")
+    balance_before_gift_all = models.get_user(TEST_USER)["meow_points"]
+    conn = get_connection()
+    active_users = conn.execute("SELECT user_id FROM users WHERE is_banned = 0").fetchall()
+    conn.close()
+    GIFT_ALL_AMOUNT = 10
+    for u in active_users:
+        models.add_meow_points(u["user_id"], GIFT_ALL_AMOUNT)
+    balance_after_gift_all = models.get_user(TEST_USER)["meow_points"]
+    check(
+        "اهدای همگانی به تمام کاربران فعال اعمال می‌شود",
+        balance_after_gift_all == balance_before_gift_all + GIFT_ALL_AMOUNT,
+        f"قبل: {balance_before_gift_all}, بعد: {balance_after_gift_all}",
+    )
+
+    # ---------------- ۱۷. ساخت میز کازینو ----------------
+    print("\n--- کازینو چندنفره ---")
+    CASINO_BET = 200
+    balance_before_casino = models.get_user(TEST_USER)["meow_points"]
+    models.add_meow_points(TEST_USER, -CASINO_BET)  # شبیه‌سازی کسر شرط موقع ساخت میز
+
+    conn = get_connection()
+    cur = conn.execute(
+        """INSERT INTO casino_tables (chat_id, creator_id, bet_amount, status)
+           VALUES (?, ?, ?, 'waiting')""",
+        (TEST_CHAT_ID, TEST_USER, CASINO_BET),
+    )
+    casino_table_id = cur.lastrowid
+    conn.execute(
+        "INSERT INTO casino_players (table_id, user_id) VALUES (?, ?)",
+        (casino_table_id, TEST_USER),
+    )
+    conn.execute(
+        "INSERT INTO casino_players (table_id, user_id) VALUES (?, ?)",
+        (casino_table_id, TEST_USER_2),
+    )
+    conn.commit()
+
+    players_count = conn.execute(
+        "SELECT COUNT(*) as c FROM casino_players WHERE table_id = ?", (casino_table_id,)
+    ).fetchone()["c"]
+    conn.close()
+
+    check("ساخت میز کازینو و افزودن بازیکنان کار می‌کند", players_count == 2, f"تعداد: {players_count}")
 
     # ---------------- خلاصه نهایی ----------------
     print("\n" + "=" * 50)

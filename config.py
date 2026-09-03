@@ -66,3 +66,15 @@ GAME_TYPES = {
 
 # ------- پنل ادمین -------
 ADMIN_GIFT_MAX_AMOUNT = 10_000_000  # حداکثر مقداری که ادمین یکجا هدیه میده
+
+# ------- آیتم شانسی تو گروه (جوجه گمشده / دونه طلایی) -------
+CHANCE_SPAWN_MESSAGE_INTERVAL = 50  # بعد از هر ۵۰ پیام تو گروه، شانس ظاهر شدن
+CHANCE_SPAWN_EXPIRE_SECONDS = 120   # بعد از ۲ دقیقه اگه کسی نخرید، منقضی میشه
+
+# ------- کازینو چندنفره -------
+CASINO_MIN_LEVEL = 4
+CASINO_TABLE_MIN_LEVEL = 6
+CASINO_MIN_PLAYERS = 2
+CASINO_MAX_PLAYERS = 8
+CASINO_JOIN_WINDOW_SECONDS = 60  # مدت زمانی که میز باز میمونه تا بقیه بپیوندن
+

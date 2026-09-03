@@ -19,6 +19,8 @@ from handlers.market import router as market_router
 from handlers.leaderboard import router as leaderboard_router
 from handlers.admin import router as admin_router
 from handlers.games.table_games import router as games_router
+from handlers.games.casino import router as casino_router
+from handlers.chance_spawn import router as chance_spawn_router
 
 logging.basicConfig(level=logging.INFO)
 
@@ -36,7 +38,11 @@ async def main():
     dp.include_router(market_router)
     dp.include_router(leaderboard_router)
     dp.include_router(games_router)
-    dp.include_router(meow_router)    # هندلرهای متنی عمومی، آخر بمونه بهتره
+    dp.include_router(casino_router)
+    dp.include_router(meow_router)    # هندلرهای متنی عمومی
+    # chance_spawn_router باید آخرین باشه: فیلترش (F.text تو گروه) خیلی
+    # عمومیه و باید فقط وقتی هیچکدوم از دستورات بالا match نکردن اجرا بشه.
+    dp.include_router(chance_spawn_router)
 
     logging.info("ربات جوجو استارت شد ✅")
     await dp.start_polling(bot)
