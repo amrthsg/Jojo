@@ -189,3 +189,45 @@ def get_all_dynamic_admins():
     conn.close()
     return rows
 
+
+# ---------------- شمارنده پیام گروه (برای آیتم شانسی) ----------------
+
+def increment_group_message_count(chat_id: int, threshold: int) -> bool:
+    """
+    شمارنده پیام‌های گروه رو یکی زیاد میکنه. اگه به آستانه (threshold) رسید،
+    شمارنده رو صفر میکنه و True برمیگردونه (یعنی وقت ظاهر شدن آیتم شانسیه).
+    """
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT message_count FROM group_message_counters WHERE chat_id = ?", (chat_id,)
+    ).fetchone()
+
+    if row is None:
+        conn.execute(
+            "INSERT INTO group_message_counters (chat_id, message_count) VALUES (?, 1)",
+            (chat_id,),
+        )
+        conn.commit()
+        conn.close()
+        return False
+
+    new_count = row["message_count"] + 1
+
+    if new_count >= threshold:
+        conn.execute(
+            "UPDATE group_message_counters SET message_count = 0 WHERE chat_id = ?",
+            (chat_id,),
+        )
+        conn.commit()
+        conn.close()
+        return True
+
+    conn.execute(
+        "UPDATE group_message_counters SET message_count = ? WHERE chat_id = ?",
+        (new_count, chat_id),
+    )
+    conn.commit()
+    conn.close()
+    return False
+
+

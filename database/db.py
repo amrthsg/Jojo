@@ -139,6 +139,51 @@ def init_db():
         )
     """)
 
+    # شمارنده پیام هر گروه - برای تعیین زمان ظاهر شدن آیتم شانسی (هر ۵۰ پیام)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS group_message_counters (
+            chat_id INTEGER PRIMARY KEY,
+            message_count INTEGER DEFAULT 0
+        )
+    """)
+
+    # آیتم‌های شانسی که الان تو یک گروه فعالن و منتظر خریدارن
+    # (بعد از خرید یا timeout حذف/غیرفعال میشن)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS chance_spawns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER,
+            message_id INTEGER,
+            item_name TEXT,
+            price INTEGER,
+            status TEXT DEFAULT 'active',   -- active / bought / expired
+            bought_by INTEGER,
+            created_at INTEGER DEFAULT (strftime('%s','now'))
+        )
+    """)
+
+    # بازی کازینو چندنفره (شرط‌بندی گروهی، برنده کل میز رو میبره)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS casino_tables (
+            table_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER,
+            creator_id INTEGER,
+            bet_amount INTEGER,
+            status TEXT DEFAULT 'waiting',  -- waiting / finished
+            winner_id INTEGER,
+            created_at INTEGER DEFAULT (strftime('%s','now'))
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS casino_players (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            table_id INTEGER,
+            user_id INTEGER,
+            FOREIGN KEY (table_id) REFERENCES casino_tables(table_id)
+        )
+    """)
+
     conn.commit()
 
     # ---------------- Migration خودکار ----------------
