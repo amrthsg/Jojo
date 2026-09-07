@@ -9,6 +9,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import BOT_TOKEN
 from database.db import init_db
+from utils.middleware import DisplayNameMiddleware
 
 # ⚠️ نکته مهم: تمام روترها باید اینجا import و register بشن
 # قبل از asyncio.run(main()) - این باگی بود که تو پروژه قبلیت (Sssdddd) پیدا کردیم!
@@ -30,6 +31,9 @@ async def main():
 
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
+
+    # میدلور به‌روزرسانی خودکار اسم و یوزرنیم کاربر (برای پروفایل و لیدربرد)
+    dp.message.middleware(DisplayNameMiddleware())
 
     # ترتیب رجیستر مهمه: اول start، بعد بقیه
     dp.include_router(start_router)

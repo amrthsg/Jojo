@@ -191,6 +191,85 @@ def run_tests():
     account_2 = bank_models.get_bank_account(TEST_USER_2)
     check("مقصد انتقال مبلغ را دریافت کرد", account_2["balance"] == 100, f"مقدار: {account_2['balance']}")
 
+    # ---------------- ۸ب. ویژگی‌های جدید بانک (وام/قفل/پیش‌نمایش/تراکنش) ----------------
+    print("\n--- پیش‌نمایش سود ---")
+    preview = bank_models.preview_next_interest(TEST_USER)
+    check("پیش‌نمایش سود خروجی معتبر می‌دهد", preview is not None and len(preview) == 4)
+    base_balance, interest_preview, balance_after, remaining = preview
+    check(
+        "محاسبه‌ی موجودی بعد از سود درست است",
+        balance_after == base_balance + interest_preview,
+        f"مبنا: {base_balance}, سود: {interest_preview}, بعد: {balance_after}",
+    )
+
+    print("\n--- قفل بانک ---")
+    account_before_lock = bank_models.get_bank_account(TEST_USER)
+    check("بانک ابتدا قفل نیست", account_before_lock["is_locked"] == 0)
+
+    bank_models.toggle_bank_lock(TEST_USER, True)
+    account_after_lock = bank_models.get_bank_account(TEST_USER)
+    check("قفل کردن بانک کار می‌کند", account_after_lock["is_locked"] == 1)
+
+    bank_models.toggle_bank_lock(TEST_USER, False)
+    account_after_unlock = bank_models.get_bank_account(TEST_USER)
+    check("باز کردن قفل بانک کار می‌کند", account_after_unlock["is_locked"] == 0)
+
+    print("\n--- تراکنش‌های بانکی ---")
+    txs = bank_models.get_bank_transactions(TEST_USER, limit=10)
+    check("لیست تراکنش‌های بانکی خروجی می‌دهد", len(txs) >= 1, f"تعداد: {len(txs)}")
+
+    print("\n--- وام بانکی ---")
+    active_loan_before = bank_models.get_active_loan(TEST_USER)
+    check("کاربر ابتدا وام فعال ندارد", active_loan_before is None)
+
+    LOAN_AMOUNT = 100_000
+    LOAN_FEE_PCT = 10
+    LOAN_INSTALLMENTS = 3
+    balance_before_loan = models.get_user(TEST_USER)["meow_points"]
+
+    success, msg, loan = bank_models.request_loan(TEST_USER, LOAN_AMOUNT, LOAN_FEE_PCT, LOAN_INSTALLMENTS)
+    check("درخواست وام موفق است", success is True, msg)
+
+    balance_after_loan = models.get_user(TEST_USER)["meow_points"]
+    check(
+        "مبلغ وام به کیف پول واریز شد",
+        balance_after_loan == balance_before_loan + LOAN_AMOUNT,
+        f"قبل: {balance_before_loan}, بعد: {balance_after_loan}",
+    )
+
+    expected_total = int(LOAN_AMOUNT * (1 + LOAN_FEE_PCT / 100))
+    check(
+        "مبلغ کل وام شامل کارمزد درست محاسبه شده",
+        loan["total_amount"] == expected_total,
+        f"مقدار: {loan['total_amount']}, انتظار: {expected_total}",
+    )
+
+    duplicate_success, duplicate_msg, _ = bank_models.request_loan(TEST_USER, 1000, LOAN_FEE_PCT, LOAN_INSTALLMENTS)
+    check("درخواست وام دوم درحالی‌که وام فعال هست رد می‌شود", duplicate_success is False)
+
+    # شبیه‌سازی گذر زمان با دستکاری مستقیم last_payment_time برای تست پرداخت خودکار قسط
+    conn = get_connection()
+    conn.execute(
+        "UPDATE bank_loans SET last_payment_time = 0 WHERE user_id = ? AND status = 'active'",
+        (TEST_USER,),
+    )
+    conn.commit()
+    conn.close()
+
+    balance_before_installment = models.get_user(TEST_USER)["meow_points"]
+    paid, deducted, pay_msg = bank_models.pay_loan_installment(TEST_USER, 3600)  # آستانه 1 ساعته برای تست
+    check("پرداخت خودکار قسط وام کار می‌کند", paid is True, pay_msg)
+
+    balance_after_installment = models.get_user(TEST_USER)["meow_points"]
+    check(
+        "مبلغ قسط از کیف پول کسر شد",
+        balance_after_installment == balance_before_installment - deducted,
+        f"قبل: {balance_before_installment}, بعد: {balance_after_installment}, کسر: {deducted}",
+    )
+
+    loan_after_payment = bank_models.get_active_loan(TEST_USER)
+    check("تعداد اقساط پرداخت‌شده افزایش یافت", loan_after_payment["installments_paid"] == 1)
+
     # ---------------- ۹. مارکت ----------------
     print("\n--- مارکت ---")
     conn = get_connection()
