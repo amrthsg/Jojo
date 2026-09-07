@@ -29,6 +29,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
             username TEXT,
+            display_name TEXT,               -- اسم کامل تلگرام (برای پروفایل و لیدربرد)
             pet_name TEXT DEFAULT 'جوجو',
             level INTEGER DEFAULT 1,
             exp INTEGER DEFAULT 0,           -- تعداد جیک انجام شده (تجمعی)
@@ -37,6 +38,7 @@ def init_db():
             rank_level INTEGER DEFAULT 1,    -- مقام (هر ۵ سطح ارتقا)
             last_meow_time INTEGER DEFAULT 0,   -- unix timestamp آخرین جیک
             last_name_change INTEGER DEFAULT 0,
+            last_fed_time INTEGER DEFAULT 0,    -- آخرین بار که به جوجو غذا داده شده
             is_banned INTEGER DEFAULT 0,
             is_jailed INTEGER DEFAULT 0,     -- زندانی توسط ادمین (جدا از بن کامل)
             created_at INTEGER DEFAULT (strftime('%s','now'))
@@ -51,8 +53,26 @@ def init_db():
             card_number TEXT UNIQUE,
             last_interest_time INTEGER DEFAULT 0,
             last_card_change INTEGER DEFAULT 0,
+            total_interest_earned INTEGER DEFAULT 0,  -- مجموع کل سودی که تا الان گرفته
+            is_locked INTEGER DEFAULT 0,              -- قفل بانک: مخفی کردن موجودی از دید بقیه
             opened_at INTEGER DEFAULT (strftime('%s','now')),
             FOREIGN KEY (user_id) REFERENCES users(user_id)
+        )
+    """)
+
+    # وام‌های بانکی
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS bank_loans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            total_amount INTEGER,          -- مبلغ کل وام (شامل کارمزد)
+            remaining_amount INTEGER,      -- مانده‌ی بازپرداخت‌نشده
+            installment_amount INTEGER,    -- مبلغ هر قسط
+            installments_total INTEGER,    -- تعداد کل اقساط
+            installments_paid INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'active',  -- active / paid / defaulted
+            last_payment_time INTEGER DEFAULT 0,
+            created_at INTEGER DEFAULT (strftime('%s','now'))
         )
     """)
 
@@ -184,6 +204,57 @@ def init_db():
         )
     """)
 
+    # ---------------- کارخونه جوجویی ----------------
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS factories (
+            user_id INTEGER PRIMARY KEY,
+            level INTEGER DEFAULT 1,
+            workers_count INTEGER DEFAULT 0,
+            storage_capacity INTEGER DEFAULT 5000,
+            storage_used INTEGER DEFAULT 0,
+            device_level INTEGER DEFAULT 1,
+            current_product TEXT,
+            production_start_time INTEGER DEFAULT 0,
+            production_amount INTEGER DEFAULT 0,
+            created_at INTEGER DEFAULT (strftime('%s','now'))
+        )
+    """)
+
+    # ---------------- شهر جوجویی (گروهی) ----------------
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS cities (
+            chat_id INTEGER PRIMARY KEY,
+            level INTEGER DEFAULT 1,
+            treasury INTEGER DEFAULT 0,       -- خزانه شهر (دونیت‌شده توسط اعضا)
+            total_jik INTEGER DEFAULT 0,      -- مجموع جیک‌های ثبت‌شده در شهر
+            population INTEGER DEFAULT 0,     -- تعداد جوجه‌های خیابونی نجات‌داده‌شده در شهر
+            created_at INTEGER DEFAULT (strftime('%s','now'))
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS city_donations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER,
+            user_id INTEGER,
+            amount INTEGER,
+            timestamp INTEGER DEFAULT (strftime('%s','now'))
+        )
+    """)
+
+    # ---------------- قاچاق جوجه ----------------
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS smuggling_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            chick_count INTEGER,       -- تعداد جوجه‌های قاچاق‌شده در این ماموریت
+            status TEXT DEFAULT 'in_progress',  -- in_progress / success / caught
+            reward INTEGER DEFAULT 0,
+            started_at INTEGER DEFAULT (strftime('%s','now')),
+            finishes_at INTEGER DEFAULT 0
+        )
+    """)
+
     conn.commit()
 
     # ---------------- Migration خودکار ----------------
@@ -192,6 +263,10 @@ def init_db():
     # رو اضافه نمیکنه. این بخش هر ستون جدیدی که در آپدیت‌های بعدی اضافه شده
     # رو چک میکنه و اگه نبود، اضافه‌ش میکنه - بدون نیاز به پاک کردن دیتابیس.
     _add_column_if_missing(conn, "users", "is_jailed", "INTEGER DEFAULT 0")
+    _add_column_if_missing(conn, "users", "display_name", "TEXT")
+    _add_column_if_missing(conn, "users", "last_fed_time", "INTEGER DEFAULT 0")
+    _add_column_if_missing(conn, "bank_accounts", "total_interest_earned", "INTEGER DEFAULT 0")
+    _add_column_if_missing(conn, "bank_accounts", "is_locked", "INTEGER DEFAULT 0")
 
     conn.commit()
     conn.close()

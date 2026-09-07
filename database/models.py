@@ -18,7 +18,7 @@ def get_user(user_id: int):
     return row
 
 
-def create_user_if_not_exists(user_id: int, username: str | None):
+def create_user_if_not_exists(user_id: int, username: str | None, display_name: str | None = None):
     """
     اگه کاربر تازه‌ست، جوجوی جدید براش می‌سازه.
     خروجی: True اگه تازه ساخته شد، False اگه از قبل بود.
@@ -30,15 +30,35 @@ def create_user_if_not_exists(user_id: int, username: str | None):
     conn = get_connection()
     conn.execute(
         """
-        INSERT INTO users (user_id, username, pet_name, level, exp,
+        INSERT INTO users (user_id, username, display_name, pet_name, level, exp,
                             meow_points, capacity, rank_level, last_meow_time)
-        VALUES (?, ?, ?, 1, 0, 0, ?, 1, 0)
+        VALUES (?, ?, ?, ?, 1, 0, 0, ?, 1, 0)
         """,
-        (user_id, username, DEFAULT_PET_NAME, BASE_CAPACITY),
+        (user_id, username, display_name, DEFAULT_PET_NAME, BASE_CAPACITY),
     )
     conn.commit()
     conn.close()
     return True
+
+
+def update_display_name(user_id: int, display_name: str, username: str | None = None):
+    """
+    اسم تلگرام کاربر رو به‌روز میکنه - هر بار کاربر پیامی میفرسته صدا زده میشه
+    تا اگه اسمش رو تلگرام عوض کرد، تو دیتابیس هم به‌روز بمونه.
+    """
+    conn = get_connection()
+    if username is not None:
+        conn.execute(
+            "UPDATE users SET display_name = ?, username = ? WHERE user_id = ?",
+            (display_name, username, user_id),
+        )
+    else:
+        conn.execute(
+            "UPDATE users SET display_name = ? WHERE user_id = ?",
+            (display_name, user_id),
+        )
+    conn.commit()
+    conn.close()
 
 
 def update_pet_name(user_id: int, new_name: str):
@@ -129,7 +149,7 @@ def get_leaderboard(order_by: str = "meow_points", limit: int = 10):
 
     conn = get_connection()
     rows = conn.execute(
-        f"""SELECT user_id, username, pet_name, level, {order_by} as score
+        f"""SELECT user_id, username, display_name, pet_name, level, {order_by} as score
             FROM users
             WHERE is_banned = 0
             ORDER BY {order_by} DESC
@@ -230,4 +250,29 @@ def increment_group_message_count(chat_id: int, threshold: int) -> bool:
     conn.close()
     return False
 
+
+# ---------------- غذای جوجه ----------------
+
+def feed_pet(user_id: int):
+    """جوجو رو سیر میکنه (زمان آخرین غذا رو به الان آپدیت میکنه)"""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE users SET last_fed_time = ? WHERE user_id = ?",
+        (int(time.time()), user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def is_pet_hungry(user_id: int, hunger_interval_seconds: int) -> bool:
+    """
+    چک میکنه آیا جوجو گرسنه‌ست یا نه.
+    اگه last_fed_time صفر باشه (هیچوقت غذا نخورده)، گرسنه محسوب نمیشه
+    تا کاربرای جدید همون اول گیر نکنن؛ فقط بعد از اولین بار جیک کردن حساب میشه.
+    """
+    user = get_user(user_id)
+    if not user or user["last_fed_time"] == 0:
+        return False
+    elapsed = int(time.time()) - user["last_fed_time"]
+    return elapsed >= hunger_interval_seconds
 

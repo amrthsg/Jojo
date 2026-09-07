@@ -108,13 +108,62 @@ def calculate_and_apply_interest(user_id: int):
 
     conn = get_connection()
     conn.execute(
-        "UPDATE bank_accounts SET balance = ?, last_interest_time = ? WHERE user_id = ?",
-        (balance, new_interest_time, user_id),
+        """UPDATE bank_accounts
+           SET balance = ?, last_interest_time = ?, total_interest_earned = total_interest_earned + ?
+           WHERE user_id = ?""",
+        (balance, new_interest_time, total_interest, user_id),
     )
     conn.commit()
     conn.close()
 
     return total_interest
+
+
+def preview_next_interest(user_id: int):
+    """
+    محاسبه‌ی پیش‌نمایش سود بعدی، بدون اینکه واقعاً اعمالش کنه.
+    برای نمایش تو صفحه‌ی بانک استفاده میشه.
+    خروجی: (موجودی فعلی، سود قابل دریافت، موجودی بعد از سود، ثانیه‌های باقی‌مانده تا واریز بعدی)
+    """
+    account = get_bank_account(user_id)
+    if not account:
+        return None
+
+    now = int(time.time())
+    elapsed = now - account["last_interest_time"]
+    remaining = max(0, 24 * 3600 - elapsed)
+
+    interest = min(int(account["balance"] * BANK_DAILY_INTEREST_RATE), BANK_DAILY_INTEREST_CAP)
+    balance_after = account["balance"] + interest
+
+    return account["balance"], interest, balance_after, remaining
+
+
+def toggle_bank_lock(user_id: int, locked: bool):
+    """قفل/بازکردن نمایش عمومی موجودی بانکی کاربر"""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE bank_accounts SET is_locked = ? WHERE user_id = ?",
+        (1 if locked else 0, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_bank_transactions(user_id: int, limit: int = 10):
+    """
+    آخرین تراکنش‌های کارت‌به‌کارت که این کاربر توشون فرستنده یا گیرنده بوده.
+    """
+    conn = get_connection()
+    rows = conn.execute(
+        """SELECT * FROM transactions
+           WHERE (from_user = ? OR to_user = ?) AND tx_type = 'card_transfer'
+           ORDER BY timestamp DESC
+           LIMIT ?""",
+        (user_id, user_id, limit),
+    ).fetchall()
+    conn.close()
+    return rows
 
 
 def calculate_transfer_fee(amount: int):
@@ -194,3 +243,97 @@ def change_card_number(user_id: int, cost: int):
     conn.commit()
     conn.close()
     return True, "شماره حساب تغییر کرد", new_number
+
+
+# ---------------- وام بانکی ----------------
+
+def get_active_loan(user_id: int):
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM bank_loans WHERE user_id = ? AND status = 'active'", (user_id,)
+    ).fetchone()
+    conn.close()
+    return row
+
+
+def request_loan(user_id: int, amount: int, fee_percent: int, installments: int):
+    """
+    درخواست وام جدید. کارمزد رو به مبلغ کل اضافه میکنه و تقسیم بر اقساط میکنه.
+    مبلغ وام مستقیم به کیف پول (meow_points) کاربر واریز میشه.
+    خروجی: (success, message, loan_row)
+    """
+    existing = get_active_loan(user_id)
+    if existing:
+        return False, "شما همین الان یک وام فعال دارید", None
+
+    fee = int(amount * fee_percent / 100)
+    total_amount = amount + fee
+    installment_amount = total_amount // installments
+    # باقیمانده تقسیم رو به آخرین قسط اضافه میکنیم تا جمع دقیق بمونه
+    remainder = total_amount - (installment_amount * installments)
+
+    conn = get_connection()
+    cur = conn.execute(
+        """INSERT INTO bank_loans
+           (user_id, total_amount, remaining_amount, installment_amount,
+            installments_total, installments_paid, status, last_payment_time)
+           VALUES (?, ?, ?, ?, ?, 0, 'active', ?)""",
+        (user_id, total_amount, total_amount, installment_amount, installments, int(time.time())),
+    )
+    loan_id = cur.lastrowid
+    conn.execute(
+        "UPDATE users SET meow_points = meow_points + ? WHERE user_id = ?",
+        (amount, user_id),
+    )
+    conn.commit()
+
+    loan = conn.execute("SELECT * FROM bank_loans WHERE id = ?", (loan_id,)).fetchone()
+    conn.close()
+
+    return True, f"وام {amount:,} با کارمزد {fee:,} تایید شد", loan
+
+
+def pay_loan_installment(user_id: int, interval_seconds: int):
+    """
+    اگه قسط سررسید شده باشه، به‌صورت خودکار از کیف پول کاربر کسر میکنه.
+    این تابع باید هر بار که کاربر تعامل می‌کنه (مثلاً موقع باز کردن بانک) صدا زده بشه.
+    خروجی: (paid: bool, amount_deducted: int, message: str)
+    """
+    loan = get_active_loan(user_id)
+    if not loan:
+        return False, 0, ""
+
+    now = int(time.time())
+    elapsed = now - loan["last_payment_time"]
+
+    if elapsed < interval_seconds:
+        return False, 0, ""
+
+    from database.models import get_user, add_meow_points
+
+    user = get_user(user_id)
+    installment = min(loan["installment_amount"], loan["remaining_amount"])
+
+    conn = get_connection()
+
+    if user["meow_points"] < installment:
+        # کاربر موجودی کافی نداره - وام معوق میشه (فعلاً فقط لاگ میکنیم، جریمه‌ی سخت‌گیرانه نداریم)
+        conn.close()
+        return False, 0, "موجودی کافی برای پرداخت قسط وام نداری! لطفاً شارژ کن."
+
+    add_meow_points(user_id, -installment)
+
+    new_remaining = loan["remaining_amount"] - installment
+    new_paid_count = loan["installments_paid"] + 1
+    new_status = "paid" if new_remaining <= 0 else "active"
+
+    conn.execute(
+        """UPDATE bank_loans
+           SET remaining_amount = ?, installments_paid = ?, status = ?, last_payment_time = ?
+           WHERE id = ?""",
+        (max(0, new_remaining), new_paid_count, new_status, now, loan["id"]),
+    )
+    conn.commit()
+    conn.close()
+
+    return True, installment, f"قسط وام ({installment:,}) به‌صورت خودکار کسر شد"
