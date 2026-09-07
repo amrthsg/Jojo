@@ -1,10 +1,11 @@
 # handlers/leaderboard.py
-# لیدربرد - کاملاً متنی بدون هیچ دکمه‌ای
+# لیدربرد - با دکمه شیشه‌ای
 
 from aiogram import Router, F
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 
 from database.models import get_leaderboard
+from keyboards.main_kb import leaderboard_menu_kb
 from config import CURRENCY_EMOJI
 
 router = Router()
@@ -16,7 +17,8 @@ def _format_leaderboard(rows, title: str) -> str:
     lines = [f"🏆 <b>{title}</b>\n"]
     for i, row in enumerate(rows):
         medal = MEDALS[i] if i < 3 else f"{i + 1}."
-        name = row["pet_name"] or row["username"] or "ناشناس"
+        # اسم واقعی تلگرام رو ترجیح می‌دیم، وگرنه نام جوجو یا یوزرنیم
+        name = row["display_name"] or row["pet_name"] or row["username"] or "ناشناس"
         lines.append(f"{medal} {name} — {row['score']:,} {CURRENCY_EMOJI}")
     if not rows:
         lines.append("هنوز کسی امتیازی نداره!")
@@ -26,30 +28,31 @@ def _format_leaderboard(rows, title: str) -> str:
 @router.message(F.text == "لیدربرد")
 async def handle_leaderboard_menu(message: Message):
     await message.answer(
-        "🏆 <b>لیدربرد جوجو</b>\n\n"
-        "بنویس «لیدربرد پوینت» برای ثروتمندترین‌ها\n"
-        "بنویس «لیدربرد فعالیت» برای پرفعالیت‌ترین‌ها\n"
-        "بنویس «لیدربرد سطح» برای بالاسطح‌ترین‌ها",
+        "🏆 <b>لیدربرد جوجو</b>\n\nیکی از لیدربردها رو انتخاب کن:",
+        reply_markup=leaderboard_menu_kb(),
         parse_mode="HTML",
     )
 
 
-@router.message(F.text.in_({"لیدربرد پوینت", "لیدربرد ثروت"}))
-async def handle_lb_points(message: Message):
+@router.callback_query(F.data == "lb_meow_points")
+async def cb_lb_points(callback: CallbackQuery):
     rows = get_leaderboard("meow_points", limit=10)
     text = _format_leaderboard(rows, "ثروتمندترین‌های جوجو")
-    await message.answer(text, parse_mode="HTML")
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=leaderboard_menu_kb())
+    await callback.answer()
 
 
-@router.message(F.text.in_({"لیدربرد فعالیت", "لیدربرد تجربه"}))
-async def handle_lb_exp(message: Message):
+@router.callback_query(F.data == "lb_exp")
+async def cb_lb_exp(callback: CallbackQuery):
     rows = get_leaderboard("exp", limit=10)
     text = _format_leaderboard(rows, "پرفعالیت‌ترین‌های جوجو")
-    await message.answer(text, parse_mode="HTML")
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=leaderboard_menu_kb())
+    await callback.answer()
 
 
-@router.message(F.text == "لیدربرد سطح")
-async def handle_lb_level(message: Message):
+@router.callback_query(F.data == "lb_level")
+async def cb_lb_level(callback: CallbackQuery):
     rows = get_leaderboard("level", limit=10)
     text = _format_leaderboard(rows, "بالاسطح‌ترین‌های جوجو")
-    await message.answer(text, parse_mode="HTML")
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=leaderboard_menu_kb())
+    await callback.answer()

@@ -58,8 +58,9 @@ def _guide_text() -> str:
 async def cmd_start(message: Message):
     user_id = message.from_user.id
     username = message.from_user.username or message.from_user.first_name
+    display_name = message.from_user.full_name
 
-    create_user_if_not_exists(user_id, username)
+    create_user_if_not_exists(user_id, username, display_name)
     bot_info = await message.bot.get_me()
 
     # اگه از نسخه‌های قدیمی‌تر ربات، یه Reply Keyboard (منوی پایین صفحه)

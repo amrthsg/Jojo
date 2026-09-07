@@ -1,12 +1,13 @@
 # handlers/market.py
-# مارکت جوجو - کاملاً متنی، خرید با تایپ «خرید {نام محصول}»
+# مارکت جوجو - با دکمه شیشه‌ای، خرید با کلیک روی دکمه محصول
 
 from datetime import date
 from aiogram import Router, F
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 
 from database.db import get_connection
 from database.models import get_user, add_meow_points
+from keyboards.main_kb import market_menu_kb
 from config import CURRENCY_EMOJI
 
 router = Router()
@@ -25,6 +26,7 @@ def _seed_default_items():
             [
                 ("جوجه گمشده", 500, "stray_chick", "یک جوجه‌ی تنها برای پناه دادن"),
                 ("دونه غذای طلایی", 300, "food", "افزایش سرعت جیک کردن برای مدتی"),
+                ("دان جوجه", 150, "chick_food", "غذای روزانه جوجو برای ادامه تولید"),
             ],
         )
         conn.commit()
@@ -41,30 +43,27 @@ async def handle_market(message: Message):
 
     lines = ["🛍 <b>مارکت جوجو</b>\n", "روزانه فقط ۵۰ محصول میتونی بخری.\n"]
     for item in items:
-        lines.append(f"• {item['name']} — {item['price']:,} {CURRENCY_EMOJI}")
-        lines.append(f"  {item['description']}")
-    lines.append("\nبرای خرید بنویس: «خرید {نام محصول}» مثلاً: خرید جوجه گمشده")
+        lines.append(f"• {item['name']} — {item['description']}")
 
-    await message.answer("\n".join(lines), parse_mode="HTML")
+    await message.answer("\n".join(lines), reply_markup=market_menu_kb(items), parse_mode="HTML")
 
 
-@router.message(F.text.startswith("خرید "))
-async def handle_buy_item(message: Message):
-    item_name = message.text.replace("خرید ", "", 1).strip()
-    user_id = message.from_user.id
+@router.callback_query(F.data.startswith("market_buy_"))
+async def cb_buy_item(callback: CallbackQuery):
+    item_id = int(callback.data.replace("market_buy_", ""))
+    user_id = callback.from_user.id
     today = date.today().isoformat()
 
     conn = get_connection()
     item = conn.execute(
-        "SELECT * FROM market_items WHERE name = ?", (item_name,)
+        "SELECT * FROM market_items WHERE item_id = ?", (item_id,)
     ).fetchone()
 
     if not item:
         conn.close()
-        await message.answer("❌ این محصول تو مارکت پیدا نشد. بنویس «مارکت» تا لیست رو ببینی.")
+        await callback.answer("❌ این محصول موجود نیست", show_alert=True)
         return
 
-    # چک محدودیت روزانه
     bought_today = conn.execute(
         """SELECT COALESCE(SUM(quantity), 0) as total FROM market_purchases
            WHERE user_id = ? AND purchase_date = ?""",
@@ -73,27 +72,32 @@ async def handle_buy_item(message: Message):
 
     if bought_today >= DAILY_PURCHASE_LIMIT:
         conn.close()
-        await message.answer("❌ سقف خرید روزانه (۵۰ عدد) پر شده!")
+        await callback.answer("❌ سقف خرید روزانه (۵۰ عدد) پر شده!", show_alert=True)
         return
 
     user = get_user(user_id)
     if not user:
         conn.close()
-        await message.answer("اول باید /start بزنی 🐤")
+        await callback.answer("اول باید /start بزنی 🐤", show_alert=True)
         return
 
     if user["meow_points"] < item["price"]:
         conn.close()
-        await message.answer("❌ موجودی کافی نیست.")
+        await callback.answer("❌ موجودی کافی نیست", show_alert=True)
         return
 
     add_meow_points(user_id, -item["price"])
     conn.execute(
         """INSERT INTO market_purchases (user_id, item_id, quantity, purchase_date)
            VALUES (?, ?, 1, ?)""",
-        (user_id, item["item_id"], today),
+        (user_id, item_id, today),
     )
     conn.commit()
     conn.close()
 
-    await message.answer(f"✅ «{item['name']}» خریداری شد!")
+    # اگه آیتم خریداری‌شده «دان جوجه» بود، مستقیم به شکم جوجو اضافه کن
+    if item["item_type"] == "chick_food":
+        from database.models import feed_pet
+        feed_pet(user_id)
+
+    await callback.answer(f"✅ {item['name']} خریداری شد!", show_alert=True)

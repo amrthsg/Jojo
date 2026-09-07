@@ -12,6 +12,8 @@ from database.models import (
     add_exp,
     set_last_meow_time,
     set_level,
+    is_pet_hungry,
+    feed_pet,
 )
 from utils.leveling import (
     get_cooldown_seconds,
@@ -22,7 +24,16 @@ from utils.leveling import (
     get_capacity_for_rank,
     format_time,
 )
-from config import CURRENCY_NAME, CURRENCY_EMOJI, MAX_LEVEL, TRANSFER_MIN_AMOUNT, TRANSFER_MAX_AMOUNT, TRANSFER_MIN_LEVEL
+from config import (
+    CURRENCY_NAME,
+    CURRENCY_EMOJI,
+    MAX_LEVEL,
+    TRANSFER_MIN_AMOUNT,
+    TRANSFER_MAX_AMOUNT,
+    TRANSFER_MIN_LEVEL,
+    HUNGER_INTERVAL_SECONDS,
+    FEED_COST,
+)
 from utils.amount_parser import parse_amount
 
 router = Router()
@@ -47,6 +58,13 @@ async def process_meow(message: Message):
 
     if user["is_jailed"]:
         await message.answer("🔒 جوجوت الان زندانیه! باید منتظر آزادی از طرف ادمین بمونی.")
+        return
+
+    if is_pet_hungry(user_id, HUNGER_INTERVAL_SECONDS):
+        await message.answer(
+            f"🍽 {user['pet_name']} گرسنه‌ست و نمی‌تونه جیک کنه!\n"
+            f"بنویس «غذا» تا با {FEED_COST:,} {CURRENCY_EMOJI} سیرش کنی."
+        )
         return
 
     now = int(time.time())
@@ -150,18 +168,29 @@ async def handle_points_info(message: Message):
     await message.answer(text, parse_mode="HTML")
 
 
-@router.message(F.text.in_({"پروفایل", "پروفایل جوجو"}))
+@router.message(F.text.in_({"پروفایل", "پروفایل جوجو", "جیک هاش"}))
 async def handle_profile(message: Message):
-    user_id = message.from_user.id
-    user = get_user(user_id)
+    """
+    اگه روی پیام کسی ریپلای بشه، پروفایل همون کاربر نشون داده میشه؛
+    وگرنه پروفایل خود فرستنده.
+    """
+    if message.reply_to_message:
+        target_tg_user = message.reply_to_message.from_user
+    else:
+        target_tg_user = message.from_user
+
+    target_id = target_tg_user.id
+    user = get_user(target_id)
 
     if not user:
-        await message.answer("اول باید /start بزنی 🐤")
+        if message.reply_to_message:
+            await message.answer("این کاربر هنوز /start نزده.")
+        else:
+            await message.answer("اول باید /start بزنی 🐤")
         return
 
-    tg_user = message.from_user
-    full_name = tg_user.full_name  # ترکیب first_name و last_name تلگرام
-    username_line = f"🔗 @{tg_user.username}\n" if tg_user.username else ""
+    full_name = target_tg_user.full_name
+    username_line = f"🔗 @{target_tg_user.username}\n" if target_tg_user.username else ""
 
     text = (
         f"👤 <b>{full_name}</b>\n"
@@ -175,7 +204,7 @@ async def handle_profile(message: Message):
 
     # تلاش برای گرفتن عکس پروفایل واقعی تلگرام کاربر و فرستادن به همراه متن
     try:
-        photos = await message.bot.get_user_profile_photos(user_id, limit=1)
+        photos = await message.bot.get_user_profile_photos(target_id, limit=1)
         if photos.total_count > 0:
             photo_file_id = photos.photos[0][-1].file_id  # بزرگترین سایز عکس
             await message.answer_photo(photo_file_id, caption=text, parse_mode="HTML")
@@ -184,6 +213,29 @@ async def handle_profile(message: Message):
         pass  # اگه عکس نداشت یا خطا داد، فقط متن رو میفرستیم
 
     await message.answer(text, parse_mode="HTML")
+
+
+@router.message(F.text == "غذا")
+async def handle_feed(message: Message):
+    user_id = message.from_user.id
+    user = get_user(user_id)
+
+    if not user:
+        await message.answer("اول باید /start بزنی 🐤")
+        return
+
+    if not is_pet_hungry(user_id, HUNGER_INTERVAL_SECONDS):
+        await message.answer(f"😋 {user['pet_name']} الان سیره، نیازی به غذا نداره.")
+        return
+
+    if user["meow_points"] < FEED_COST:
+        await message.answer(f"❌ برای غذا دادن به {FEED_COST:,} {CURRENCY_EMOJI} نیاز داری.")
+        return
+
+    add_meow_points(user_id, -FEED_COST)
+    feed_pet(user_id)
+
+    await message.answer(f"🍽 {user['pet_name']} رو سیر کردی! حالا می‌تونه دوباره جیک کنه.")
 
 
 @router.message(F.text.startswith("تغییر نام "))
