@@ -3,10 +3,12 @@
 # هیچ دکمه‌ای اینجا نیست، همه‌چیز با تایپ متن فراخوانی میشه.
 
 import time
+import os
+import logging
 from aiogram import Router, F
 from aiogram.types import Message
 
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, FSInputFile
 
 from database.models import (
     get_user,
@@ -42,6 +44,13 @@ from utils.amount_parser import parse_amount
 router = Router()
 
 JIK_TRIGGER = "جیک جیک"
+
+# عکس پیش‌فرض پروفایل - وقتی کاربر عکس پروفایل تلگرام نداشته باشه استفاده میشه.
+# مسیر نسبی به ریشه‌ی پروژه (جایی که bot.py اجرا میشه)؛ میتونی این فایل رو با
+# یه عکس دلخواه خودت (با همین اسم) جایگزین کنی.
+DEFAULT_PROFILE_PHOTO_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "default_profile.png"
+)
 
 
 async def process_meow(message: Message):
@@ -197,7 +206,8 @@ async def handle_profile(message: Message):
 
     text = (
         f"👤 <b>{full_name}</b>\n"
-        f"{username_line}\n"
+        f"{username_line}"
+        f"🆔 آیدی عددی: <code>{target_id}</code>\n\n"
         f"🐤 <b>پروفایل {user['pet_name']}</b>\n\n"
         f"🏷 نام جوجو: {user['pet_name']}\n"
         f"👑 مقام: {user['rank_level']}\n"
@@ -212,8 +222,20 @@ async def handle_profile(message: Message):
             photo_file_id = photos.photos[0][-1].file_id  # بزرگترین سایز عکس
             await message.answer_photo(photo_file_id, caption=text, parse_mode="HTML")
             return
+        else:
+            logging.info(f"کاربر {target_id} عکس پروفایل تلگرام نداره (total_count=0)")
+    except Exception as e:
+        logging.warning(f"خطا در گرفتن عکس پروفایل کاربر {target_id}: {e}")
+
+    # اگه کاربر عکس پروفایل تلگرام نداشت، یه عکس پیش‌فرض جوجه‌ای بالای پروفایل میفرستیم
+    # تا همیشه پروفایل با عکس نمایش داده بشه.
+    try:
+        if os.path.exists(DEFAULT_PROFILE_PHOTO_PATH):
+            photo = FSInputFile(DEFAULT_PROFILE_PHOTO_PATH)
+            await message.answer_photo(photo, caption=text, parse_mode="HTML")
+            return
     except Exception:
-        pass  # اگه عکس نداشت یا خطا داد، فقط متن رو میفرستیم
+        pass  # اگه فایل پیش‌فرض هم در دسترس نبود، فقط متن رو میفرستیم
 
     await message.answer(text, parse_mode="HTML")
 
