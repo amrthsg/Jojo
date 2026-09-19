@@ -2,7 +2,8 @@
 # کیبوردهای ثابت ربات
 #
 # قانون فعلی پروژه:
-# - بانک، مارکت، لیدربرد و بازی‌ها (بسکتبال/بولینگ/دارت/فوتبال/کازینو) دکمه شیشه‌ای دارن.
+# - بانک، مارکت، لیدربرد، غذا و بازی‌ها (بسکتبال/بولینگ/دارت/فوتبال/کازینو) دکمه شیشه‌ای دارن.
+# - کارخونه، شهر و قاچاق هم دکمه شیشه‌ای هستن.
 # - پنل ادمین هم دکمه شیشه‌ای دارد.
 # - جیک جیک کردن، پروفایل، سطح، انتقال جیک و امثال این‌ها همچنان کاملاً متنی هستن.
 
@@ -123,6 +124,7 @@ def admin_panel_kb(is_owner: bool = False) -> InlineKeyboardMarkup:
          InlineKeyboardButton(text="✏️ ویرایش موجودی", callback_data="admin_edit_balance")],
         [InlineKeyboardButton(text="📢 پیام همگانی", callback_data="admin_broadcast")],
         [InlineKeyboardButton(text="🎁 اهدا به همه", callback_data="admin_gift_all")],
+        [InlineKeyboardButton(text="🎰 مدیریت کازینو", callback_data="admin_casino_panel")],
     ]
     if is_owner:
         kb.append([InlineKeyboardButton(text="👑 افزودن ادمین", callback_data="owner_add_admin")])
@@ -131,5 +133,91 @@ def admin_panel_kb(is_owner: bool = False) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
+def admin_casino_panel_kb() -> InlineKeyboardMarkup:
+    kb = [
+        [InlineKeyboardButton(text="📋 میزهای فعال", callback_data="admin_casino_active")],
+        [InlineKeyboardButton(text="📊 آمار کازینو", callback_data="admin_casino_stats")],
+        [InlineKeyboardButton(text="🔙 بازگشت", callback_data="admin_back_main")],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+def admin_back_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔙 بازگشت", callback_data="admin_back_main")]])
+
+
 def cancel_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="❌ انصراف", callback_data="cancel_fsm")]])
+
+
+# ---------------- غذای جوجه (دکمه‌ای) ----------------
+
+def feed_menu_kb() -> InlineKeyboardMarkup:
+    kb = [[InlineKeyboardButton(text="🍽 سیر کردن جوجو", callback_data="feed_pet")]]
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+# ---------------- کارخونه جوجویی ----------------
+
+def factory_menu_kb(has_factory: bool, is_producing: bool) -> InlineKeyboardMarkup:
+    kb = []
+    if not has_factory:
+        kb.append([InlineKeyboardButton(text="🏭 ساخت کارخونه", callback_data="factory_create")])
+        return InlineKeyboardMarkup(inline_keyboard=kb)
+
+    if is_producing:
+        kb.append([InlineKeyboardButton(text="📦 برداشت محصول", callback_data="factory_collect")])
+    else:
+        kb.append([InlineKeyboardButton(text="⚙️ شروع تولید", callback_data="factory_produce")])
+
+    kb.append([InlineKeyboardButton(text="💰 فروش انبار", callback_data="factory_sell")])
+    kb.append([InlineKeyboardButton(text="👷 استخدام کارگر", callback_data="factory_hire"),
+               InlineKeyboardButton(text="⬆️ ارتقا کارخونه", callback_data="factory_upgrade")])
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+def factory_products_kb(products: dict) -> InlineKeyboardMarkup:
+    kb = []
+    for key, info in products.items():
+        kb.append([InlineKeyboardButton(
+            text=f"{key} — هزینه {info['cost']:,} 🪙",
+            callback_data=f"factory_makeprod_{key}",
+        )])
+    kb.append([InlineKeyboardButton(text="🔙 بازگشت", callback_data="factory_back")])
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+# ---------------- شهر جوجویی (گروهی) ----------------
+
+def city_menu_kb() -> InlineKeyboardMarkup:
+    kb = [
+        [InlineKeyboardButton(text="💰 کمک به خزانه", callback_data="city_donate")],
+        [InlineKeyboardButton(text="🏗 ارتقای شهر", callback_data="city_upgrade")],
+        [InlineKeyboardButton(text="🏅 برترین کمک‌کننده‌ها", callback_data="city_top_donors")],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+def city_donate_amount_kb() -> InlineKeyboardMarkup:
+    amounts = [1000, 5000, 20000, 50000]
+    kb = [[InlineKeyboardButton(text=f"{a:,}", callback_data=f"citydonate_{a}")] for a in amounts]
+    kb.append([InlineKeyboardButton(text="✏️ مبلغ دلخواه", callback_data="citydonate_custom")])
+    kb.append([InlineKeyboardButton(text="🔙 بازگشت", callback_data="city_back")])
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+# ---------------- قاچاق جوجه ----------------
+
+def smuggling_menu_kb(has_active_run: bool) -> InlineKeyboardMarkup:
+    if has_active_run:
+        kb = [[InlineKeyboardButton(text="🔍 وضعیت ماموریت", callback_data="smuggling_status")]]
+    else:
+        kb = [[InlineKeyboardButton(text="🚚 شروع ماموریت قاچاق", callback_data="smuggling_start")]]
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+def smuggling_chick_count_kb(min_chicks: int, max_chicks: int) -> InlineKeyboardMarkup:
+    options = sorted(set([min_chicks, (min_chicks + max_chicks) // 2, max_chicks]))
+    kb = [[InlineKeyboardButton(text=f"{n} جوجه", callback_data=f"smuggle_go_{n}")] for n in options]
+    kb.append([InlineKeyboardButton(text="🔙 بازگشت", callback_data="smuggling_back")])
+    return InlineKeyboardMarkup(inline_keyboard=kb)
