@@ -1,7 +1,7 @@
 # config.py
 # تنظیمات اصلی ربات جوجو
 
-BOT_TOKEN = "8488308082:AAHNX2kgiO77dMUC_bbdrs_zLZIy4_kfjQ8"
+BOT_TOKEN = "8488308082:AAFS5-AUN0ik0uRGKtm2WSW_M0WLUEtQ3cE"
 
 # آیدی عددی مالک ربات - فقط همین شخص میتونه ادمین اضافه/حذف کنه
 OWNER_ID = 5779467403  # امیر
