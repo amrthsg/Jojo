@@ -6,6 +6,8 @@ import time
 from aiogram import Router, F
 from aiogram.types import Message
 
+from aiogram.types import CallbackQuery
+
 from database.models import (
     get_user,
     add_meow_points,
@@ -15,6 +17,7 @@ from database.models import (
     is_pet_hungry,
     feed_pet,
 )
+from keyboards.main_kb import feed_menu_kb
 from utils.leveling import (
     get_cooldown_seconds,
     perform_meow,
@@ -215,8 +218,21 @@ async def handle_profile(message: Message):
     await message.answer(text, parse_mode="HTML")
 
 
+def _food_menu_text(user) -> str:
+    if is_pet_hungry(user["user_id"], HUNGER_INTERVAL_SECONDS):
+        return (
+            f"🍽 <b>غذای {user['pet_name']}</b>\n\n"
+            f"{user['pet_name']} گرسنه‌ست!\n"
+            f"هزینه سیر کردن: {FEED_COST:,} {CURRENCY_EMOJI}"
+        )
+    return (
+        f"🍽 <b>غذای {user['pet_name']}</b>\n\n"
+        f"😋 {user['pet_name']} الان سیره، نیازی به غذا نداره."
+    )
+
+
 @router.message(F.text == "غذا")
-async def handle_feed(message: Message):
+async def handle_feed_menu(message: Message):
     user_id = message.from_user.id
     user = get_user(user_id)
 
@@ -224,18 +240,40 @@ async def handle_feed(message: Message):
         await message.answer("اول باید /start بزنی 🐤")
         return
 
+    await message.answer(
+        _food_menu_text(user),
+        reply_markup=feed_menu_kb(),
+        parse_mode="HTML",
+    )
+
+
+@router.callback_query(F.data == "feed_pet")
+async def cb_feed_pet(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    user = get_user(user_id)
+
+    if not user:
+        await callback.answer("اول باید /start بزنی 🐤", show_alert=True)
+        return
+
     if not is_pet_hungry(user_id, HUNGER_INTERVAL_SECONDS):
-        await message.answer(f"😋 {user['pet_name']} الان سیره، نیازی به غذا نداره.")
+        await callback.answer(f"😋 {user['pet_name']} الان سیره، نیازی به غذا نداره.", show_alert=True)
         return
 
     if user["meow_points"] < FEED_COST:
-        await message.answer(f"❌ برای غذا دادن به {FEED_COST:,} {CURRENCY_EMOJI} نیاز داری.")
+        await callback.answer(f"❌ برای غذا دادن به {FEED_COST:,} {CURRENCY_EMOJI} نیاز داری.", show_alert=True)
         return
 
     add_meow_points(user_id, -FEED_COST)
     feed_pet(user_id)
 
-    await message.answer(f"🍽 {user['pet_name']} رو سیر کردی! حالا می‌تونه دوباره جیک کنه.")
+    user = get_user(user_id)
+    await callback.answer(f"🍽 {user['pet_name']} رو سیر کردی! حالا می‌تونه دوباره جیک کنه.", show_alert=True)
+    await callback.message.edit_text(
+        _food_menu_text(user),
+        reply_markup=feed_menu_kb(),
+        parse_mode="HTML",
+    )
 
 
 @router.message(F.text.startswith("تغییر نام "))

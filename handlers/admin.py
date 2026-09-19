@@ -1,9 +1,11 @@
 # handlers/admin.py
-# پنل ادمین - کاملاً متنی، بدون هیچ دکمه‌ای
+# پنل ادمین - دکمه شیشه‌ای (glass) با منوی inline + دستورات متنی قدیمی هم فعال میمونن
+# دکمه‌ها برای اکشن‌هایی که ورودی آزاد لازم دارن (مثل اهدا به یه آیدی خاص)،
+# فقط فرمت دستور متنی رو نشون میدن؛ اکشن‌های بدون ورودی (آمار، کازینو) مستقیم اجرا میشن.
 # همه دستورات با /admin شروع میشن یا با پیشوند فارسی
 
 from aiogram import Router, F
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -21,6 +23,7 @@ from database.models import (
     get_all_dynamic_admins,
 )
 from database.db import get_connection
+from keyboards.main_kb import admin_panel_kb, admin_casino_panel_kb, admin_back_kb
 from config import ADMIN_IDS, OWNER_ID, ADMIN_GIFT_MAX_AMOUNT, CURRENCY_EMOJI
 
 router = Router()
@@ -81,8 +84,170 @@ async def cmd_admin_panel(message: Message):
 
     await message.answer(
         _admin_help_text(owner=is_owner(message.from_user.id)),
+        reply_markup=admin_panel_kb(is_owner=is_owner(message.from_user.id)),
         parse_mode="HTML",
     )
+
+
+# ---------------- منوی شیشه‌ای (inline) ----------------
+# دکمه‌هایی که ورودی آزاد (آیدی، مبلغ، متن) لازم دارن، فقط راهنمای فرمت دستور
+# متنی رو نشون میدن، چون اون منطق از قبل کاملاً پیاده و تست‌شده‌ست.
+
+_TEXT_COMMAND_HINTS = {
+    "admin_gift": "🎁 برای اهدا بنویس:\n<code>اهدا {آیدی} {مبلغ}</code>\nیا روی پیام کاربر ریپلای کن و بنویس:\n<code>اهدا {مبلغ}</code>",
+    "admin_reduce": "➖ برای کاهش موجودی، از «ویرایش موجودی» با عدد کمتر استفاده کن:\n<code>ویرایش موجودی {آیدی} {مبلغ جدید}</code>",
+    "admin_ban": "🚫 برای مسدود کردن بنویس:\n<code>بن {آیدی}</code>\nیا روی پیام کاربر ریپلای کن و بنویس «بن»",
+    "admin_unban": "✅ برای رفع مسدودیت بنویس:\n<code>آنبن {آیدی}</code>\nیا روی پیام کاربر ریپلای کن و بنویس «آنبن»",
+    "admin_jail": "🔒 برای زندانی کردن بنویس:\n<code>زندان {آیدی}</code>\nیا روی پیام کاربر ریپلای کن و بنویس «زندان»",
+    "admin_unjail": "🔓 برای آزاد کردن بنویس:\n<code>آزادی {آیدی}</code>\nیا روی پیام کاربر ریپلای کن و بنویس «آزادی»",
+    "admin_edit_level": "✏️ برای ویرایش سطح بنویس:\n<code>ویرایش سطح {آیدی} {سطح جدید}</code>",
+    "admin_edit_balance": "✏️ برای ویرایش موجودی بنویس:\n<code>ویرایش موجودی {آیدی} {مبلغ جدید}</code>",
+    "admin_broadcast": "📢 برای پیام همگانی بنویس:\n<code>همگانی {متن پیام}</code>",
+    "admin_gift_all": "🎁 برای اهدا به همه بنویس:\n<code>اهدا همه {مبلغ}</code>",
+    "owner_add_admin": "👑 برای افزودن ادمین بنویس:\n<code>افزودن ادمین {آیدی}</code>\nیا روی پیام کاربر ریپلای کن و بنویس «افزودن ادمین»",
+    "owner_remove_admin": "👑 برای حذف ادمین بنویس:\n<code>حذف ادمین {آیدی}</code>\nیا روی پیام کاربر ریپلای کن و بنویس «حذف ادمین»",
+}
+
+
+@router.callback_query(F.data.in_(_TEXT_COMMAND_HINTS.keys()))
+async def cb_admin_text_hint(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer()
+        return
+
+    if callback.data.startswith("owner_") and not is_owner(callback.from_user.id):
+        await callback.answer("❌ این بخش فقط برای مالک ربات است.", show_alert=True)
+        return
+
+    await callback.message.edit_text(
+        _TEXT_COMMAND_HINTS[callback.data],
+        reply_markup=admin_back_kb(),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_stats")
+async def cb_admin_stats(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer()
+        return
+
+    stats = get_total_stats()
+    text = (
+        f"📊 <b>آمار کلی ربات</b>\n\n"
+        f"👥 تعداد کاربران: {stats['total_users']:,}\n"
+        f"🪙 مجموع پوینت در گردش: {(stats['total_points'] or 0):,}"
+    )
+    await callback.message.edit_text(text, reply_markup=admin_back_kb(), parse_mode="HTML")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "owner_list_admins")
+async def cb_owner_list_admins(callback: CallbackQuery):
+    if not is_owner(callback.from_user.id):
+        await callback.answer("❌ این بخش فقط برای مالک ربات است.", show_alert=True)
+        return
+
+    dynamic_admins = get_all_dynamic_admins()
+
+    lines = ["👑 <b>لیست ادمین‌های ربات جوجو</b>\n", "<b>ادمین‌های اولیه (ثابت):</b>"]
+    for admin_id in ADMIN_IDS:
+        owner_tag = " (مالک)" if admin_id == OWNER_ID else ""
+        lines.append(f"• <code>{admin_id}</code>{owner_tag}")
+
+    lines.append("\n<b>ادمین‌های افزوده‌شده:</b>")
+    if dynamic_admins:
+        for admin in dynamic_admins:
+            lines.append(f"• <code>{admin['user_id']}</code>")
+    else:
+        lines.append("هیچکس")
+
+    await callback.message.edit_text("\n".join(lines), reply_markup=admin_back_kb(), parse_mode="HTML")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_casino_panel")
+async def cb_admin_casino_panel(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer()
+        return
+
+    await callback.message.edit_text(
+        "🎰 <b>مدیریت کازینو</b>\n\nیکی از گزینه‌ها رو انتخاب کن:",
+        reply_markup=admin_casino_panel_kb(),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_casino_active")
+async def cb_admin_casino_active(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer()
+        return
+
+    conn = get_connection()
+    tables = conn.execute(
+        "SELECT * FROM casino_tables WHERE status = 'waiting' ORDER BY created_at DESC LIMIT 20"
+    ).fetchall()
+    conn.close()
+
+    lines = ["📋 <b>میزهای فعال کازینو</b>\n"]
+    if not tables:
+        lines.append("هیچ میز فعالی وجود نداره.")
+    else:
+        for t in tables:
+            lines.append(
+                f"• میز #{t['table_id']} — شرط {t['bet_amount']:,} {CURRENCY_EMOJI} — چت {t['chat_id']}"
+            )
+
+    await callback.message.edit_text(
+        "\n".join(lines), reply_markup=admin_casino_panel_kb(), parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_casino_stats")
+async def cb_admin_casino_stats(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer()
+        return
+
+    conn = get_connection()
+    row = conn.execute(
+        """SELECT
+               COUNT(*) as total_tables,
+               SUM(CASE WHEN status = 'finished' THEN 1 ELSE 0 END) as finished_tables,
+               SUM(CASE WHEN status = 'waiting' THEN 1 ELSE 0 END) as active_tables,
+               COALESCE(SUM(CASE WHEN status = 'finished' THEN bet_amount ELSE 0 END), 0) as total_bet_volume
+           FROM casino_tables"""
+    ).fetchone()
+    conn.close()
+
+    text = (
+        "📊 <b>آمار کازینو</b>\n\n"
+        f"🎰 کل میزها: {row['total_tables']:,}\n"
+        f"✅ تموم‌شده: {row['finished_tables']:,}\n"
+        f"⏳ فعال: {row['active_tables']:,}\n"
+        f"💰 مجموع شرط‌های میزهای تموم‌شده: {row['total_bet_volume']:,} {CURRENCY_EMOJI}"
+    )
+    await callback.message.edit_text(text, reply_markup=admin_casino_panel_kb(), parse_mode="HTML")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_back_main")
+async def cb_admin_back_main(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer()
+        return
+
+    await callback.message.edit_text(
+        _admin_help_text(owner=is_owner(callback.from_user.id)),
+        reply_markup=admin_panel_kb(is_owner=is_owner(callback.from_user.id)),
+        parse_mode="HTML",
+    )
+    await callback.answer()
 
 
 @router.message(F.text == "آمار")
