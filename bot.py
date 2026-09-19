@@ -21,6 +21,9 @@ from handlers.leaderboard import router as leaderboard_router
 from handlers.admin import router as admin_router
 from handlers.games.table_games import router as games_router
 from handlers.games.casino import router as casino_router
+from handlers.factory import router as factory_router
+from handlers.city import router as city_router
+from handlers.smuggling import router as smuggling_router
 from handlers.chance_spawn import router as chance_spawn_router
 
 logging.basicConfig(level=logging.INFO)
@@ -43,7 +46,10 @@ async def main():
     dp.include_router(leaderboard_router)
     dp.include_router(games_router)
     dp.include_router(casino_router)
-    dp.include_router(meow_router)    # هندلرهای متنی عمومی
+    dp.include_router(factory_router)
+    dp.include_router(city_router)
+    dp.include_router(smuggling_router)
+    dp.include_router(meow_router)    # هندلرهای متنی عمومی (شامل «غذا» هم میشه)
     # chance_spawn_router باید آخرین باشه: فیلترش (F.text تو گروه) خیلی
     # عمومیه و باید فقط وقتی هیچکدوم از دستورات بالا match نکردن اجرا بشه.
     dp.include_router(chance_spawn_router)
