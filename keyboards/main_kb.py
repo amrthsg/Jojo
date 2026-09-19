@@ -102,6 +102,26 @@ def bet_amount_kb(game_type: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
+# ---------------- کازینو ----------------
+
+def casino_menu_kb() -> InlineKeyboardMarkup:
+    kb = [[InlineKeyboardButton(text="🎰 ساخت میز جدید", callback_data="casino_create")]]
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+def casino_bet_amount_kb() -> InlineKeyboardMarkup:
+    amounts = [500, 1000, 5000, 20000]
+    kb = [[InlineKeyboardButton(text=f"{a:,}", callback_data=f"casinobet_{a}")] for a in amounts]
+    kb.append([InlineKeyboardButton(text="✏️ مبلغ دلخواه", callback_data="casinobet_custom")])
+    kb.append([InlineKeyboardButton(text="🔙 بازگشت", callback_data="casino_back")])
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+def casino_join_kb(table_id: int) -> InlineKeyboardMarkup:
+    kb = [[InlineKeyboardButton(text="🎰 پیوستن به میز", callback_data=f"casino_join_{table_id}")]]
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
 def leaderboard_menu_kb() -> InlineKeyboardMarkup:
     kb = [
         [InlineKeyboardButton(text="💰 ثروتمندترین‌ها", callback_data="lb_meow_points")],
