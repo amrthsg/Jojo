@@ -196,14 +196,16 @@ async def cb_bank_percent(callback: CallbackQuery, state: FSMContext):
 
 @router.message(BankStates.waiting_deposit_amount)
 async def process_deposit_custom(message: Message, state: FSMContext):
-    if not message.text.isdigit():
-        await message.answer("❌ لطفاً فقط عدد بفرست.")
+    from utils.amount_parser import parse_amount
+
+    amount = parse_amount(message.text.strip())
+    if amount is None or amount <= 0:
+        await message.answer("❌ مبلغ نامعتبره. یه عدد بفرست، مثلاً 500000 یا 500k یا 500کا")
         return
 
-    amount = int(message.text)
     user = get_user(message.from_user.id)
 
-    if amount <= 0 or amount > user["meow_points"]:
+    if amount > user["meow_points"]:
         await message.answer("❌ موجودی کافی نیست.")
         await state.clear()
         return
@@ -215,14 +217,16 @@ async def process_deposit_custom(message: Message, state: FSMContext):
 
 @router.message(BankStates.waiting_withdraw_amount)
 async def process_withdraw_custom(message: Message, state: FSMContext):
-    if not message.text.isdigit():
-        await message.answer("❌ لطفاً فقط عدد بفرست.")
+    from utils.amount_parser import parse_amount
+
+    amount = parse_amount(message.text.strip())
+    if amount is None or amount <= 0:
+        await message.answer("❌ مبلغ نامعتبره. یه عدد بفرست، مثلاً 500000 یا 500k یا 500کا")
         return
 
-    amount = int(message.text)
     account = get_bank_account(message.from_user.id)
 
-    if not account or amount <= 0 or amount > account["balance"]:
+    if not account or amount > account["balance"]:
         await message.answer("❌ موجودی بانک کافی نیست.")
         await state.clear()
         return
@@ -290,11 +294,13 @@ async def cb_transfer_percent(callback: CallbackQuery, state: FSMContext):
 
 @router.message(BankStates.waiting_transfer_amount)
 async def process_transfer_amount_custom(message: Message, state: FSMContext):
-    if not message.text.isdigit():
-        await message.answer("❌ لطفاً فقط عدد بفرست.")
+    from utils.amount_parser import parse_amount
+
+    amount = parse_amount(message.text.strip())
+    if amount is None or amount <= 0:
+        await message.answer("❌ مبلغ نامعتبره. یه عدد بفرست، مثلاً 500000 یا 500k یا 500کا")
         return
 
-    amount = int(message.text)
     data = await state.get_data()
     to_card = data.get("to_card")
 
@@ -417,13 +423,14 @@ async def cb_loan_request(callback: CallbackQuery, state: FSMContext):
 
 @router.message(BankStates.waiting_loan_amount)
 async def process_loan_amount(message: Message, state: FSMContext):
-    if not message.text.isdigit():
-        await message.answer("❌ لطفاً فقط عدد بفرست.")
+    from utils.amount_parser import parse_amount
+
+    amount = parse_amount(message.text.strip())
+    if amount is None or amount <= 0:
+        await message.answer("❌ مبلغ نامعتبره. یه عدد بفرست، مثلاً 500000 یا 500k یا 500کا")
         return
 
-    amount = int(message.text)
-
-    if amount <= 0 or amount > LOAN_MAX_AMOUNT:
+    if amount > LOAN_MAX_AMOUNT:
         await message.answer(f"❌ مبلغ باید بین ۱ تا {LOAN_MAX_AMOUNT:,} باشد.")
         await state.clear()
         return

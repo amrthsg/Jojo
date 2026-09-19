@@ -319,17 +319,19 @@ async def handle_gift(message: Message):
     if not is_admin(message.from_user.id):
         return
 
+    from utils.amount_parser import parse_amount
+
     parts = message.text.split()[1:]
     target_id = _resolve_target(message, parts)
 
     # اگه ریپلای بود، مبلغ اولین آرگومانه؛ وگرنه دومین
     amount_str = parts[0] if message.reply_to_message and parts else (parts[1] if len(parts) > 1 else None)
+    amount = parse_amount(amount_str) if amount_str else None
 
-    if not target_id or not amount_str or not amount_str.isdigit():
-        await message.answer("❌ فرمت درست: اهدا {آیدی} {مبلغ}  (یا ریپلای کن: اهدا {مبلغ})")
+    if not target_id or amount is None:
+        await message.answer("❌ فرمت درست: اهدا {آیدی} {مبلغ}  (یا ریپلای کن: اهدا {مبلغ})\nمبلغ میتونه به شکل 500k یا 1m یا 500کا هم باشه.")
         return
 
-    amount = int(amount_str)
     if amount <= 0 or amount > ADMIN_GIFT_MAX_AMOUNT:
         await message.answer(f"❌ مقدار باید بین ۱ تا {ADMIN_GIFT_MAX_AMOUNT:,} باشد.")
         return
@@ -478,22 +480,25 @@ async def handle_edit_balance(message: Message):
     """
     فرمت: ویرایش موجودی {آیدی} {مبلغ جدید}
     یا با ریپلای: ویرایش موجودی {مبلغ جدید}
+    مبلغ میتونه به شکل 500k یا 1m یا 500کا هم باشه.
     """
     if not is_admin(message.from_user.id):
         return
+
+    from utils.amount_parser import parse_amount
 
     parts = message.text.split()[2:]  # بعد از "ویرایش موجودی"
     target_id = _resolve_target(message, parts)
 
     amount_str = parts[0] if message.reply_to_message and parts else (parts[1] if len(parts) > 1 else None)
+    new_balance = parse_amount(amount_str) if amount_str else None
 
-    if not target_id or not amount_str or not amount_str.isdigit():
+    if not target_id or new_balance is None:
         await message.answer(
-            "❌ فرمت درست: ویرایش موجودی {آیدی} {مبلغ جدید}  (یا ریپلای کن: ویرایش موجودی {مبلغ})"
+            "❌ فرمت درست: ویرایش موجودی {آیدی} {مبلغ جدید}  (یا ریپلای کن: ویرایش موجودی {مبلغ})\nمبلغ میتونه به شکل 500k یا 1m یا 500کا هم باشه."
         )
         return
 
-    new_balance = int(amount_str)
     target_user = get_user(target_id)
 
     if not target_user:
