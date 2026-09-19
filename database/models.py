@@ -276,3 +276,196 @@ def is_pet_hungry(user_id: int, hunger_interval_seconds: int) -> bool:
     elapsed = int(time.time()) - user["last_fed_time"]
     return elapsed >= hunger_interval_seconds
 
+
+# ---------------- کارخونه جوجویی ----------------
+
+def get_factory(user_id: int):
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM factories WHERE user_id = ?", (user_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def create_factory_if_not_exists(user_id: int, base_storage: int):
+    conn = get_connection()
+    existing = conn.execute("SELECT 1 FROM factories WHERE user_id = ?", (user_id,)).fetchone()
+    if existing:
+        conn.close()
+        return False
+    conn.execute(
+        "INSERT INTO factories (user_id, storage_capacity) VALUES (?, ?)",
+        (user_id, base_storage),
+    )
+    conn.commit()
+    conn.close()
+    return True
+
+
+def start_factory_production(user_id: int, product_name: str, amount: int, start_time: int):
+    conn = get_connection()
+    conn.execute(
+        """UPDATE factories
+           SET current_product = ?, production_amount = ?, production_start_time = ?
+           WHERE user_id = ?""",
+        (product_name, amount, start_time, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def collect_factory_production(user_id: int, produced_amount: int):
+    """محصول تولیدشده رو به انبار اضافه میکنه و خط تولید رو خالی میکنه"""
+    conn = get_connection()
+    conn.execute(
+        """UPDATE factories
+           SET storage_used = storage_used + ?, current_product = NULL,
+               production_amount = 0, production_start_time = 0
+           WHERE user_id = ?""",
+        (produced_amount, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def sell_factory_storage(user_id: int, amount_to_sell: int):
+    conn = get_connection()
+    conn.execute(
+        "UPDATE factories SET storage_used = storage_used - ? WHERE user_id = ?",
+        (amount_to_sell, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def upgrade_factory_level(user_id: int, new_level: int, new_storage_capacity: int):
+    conn = get_connection()
+    conn.execute(
+        "UPDATE factories SET level = ?, storage_capacity = ? WHERE user_id = ?",
+        (new_level, new_storage_capacity, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def hire_factory_worker(user_id: int):
+    conn = get_connection()
+    conn.execute(
+        "UPDATE factories SET workers_count = workers_count + 1 WHERE user_id = ?",
+        (user_id,),
+    )
+    conn.commit()
+    conn.close()
+
+
+# ---------------- شهر جوجویی (گروهی) ----------------
+
+def get_city(chat_id: int):
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM cities WHERE chat_id = ?", (chat_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def create_city_if_not_exists(chat_id: int):
+    conn = get_connection()
+    existing = conn.execute("SELECT 1 FROM cities WHERE chat_id = ?", (chat_id,)).fetchone()
+    if existing:
+        conn.close()
+        return False
+    conn.execute("INSERT INTO cities (chat_id) VALUES (?)", (chat_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def donate_to_city(chat_id: int, user_id: int, amount: int):
+    conn = get_connection()
+    conn.execute(
+        "UPDATE cities SET treasury = treasury + ? WHERE chat_id = ?", (amount, chat_id)
+    )
+    conn.execute(
+        "INSERT INTO city_donations (chat_id, user_id, amount) VALUES (?, ?, ?)",
+        (chat_id, user_id, amount),
+    )
+    conn.commit()
+    conn.close()
+
+
+def add_city_jik(chat_id: int, amount: int = 1):
+    """هر بار عضوی از گروه جیک میکنه، به مجموع جیک شهر اضافه میشه"""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE cities SET total_jik = total_jik + ? WHERE chat_id = ?", (amount, chat_id)
+    )
+    conn.commit()
+    conn.close()
+
+
+def add_city_population(chat_id: int, amount: int = 1):
+    conn = get_connection()
+    conn.execute(
+        "UPDATE cities SET population = population + ? WHERE chat_id = ?", (amount, chat_id)
+    )
+    conn.commit()
+    conn.close()
+
+
+def upgrade_city_level(chat_id: int, new_level: int):
+    conn = get_connection()
+    conn.execute("UPDATE cities SET level = ? WHERE chat_id = ?", (new_level, chat_id))
+    conn.commit()
+    conn.close()
+
+
+def get_city_top_donors(chat_id: int, limit: int = 5):
+    conn = get_connection()
+    rows = conn.execute(
+        """SELECT user_id, SUM(amount) as total FROM city_donations
+           WHERE chat_id = ? GROUP BY user_id ORDER BY total DESC LIMIT ?""",
+        (chat_id, limit),
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+# ---------------- قاچاق جوجه ----------------
+
+def create_smuggling_run(user_id: int, chick_count: int, reward: int, started_at: int, finishes_at: int):
+    conn = get_connection()
+    cur = conn.execute(
+        """INSERT INTO smuggling_runs (user_id, chick_count, reward, started_at, finishes_at)
+           VALUES (?, ?, ?, ?, ?)""",
+        (user_id, chick_count, reward, started_at, finishes_at),
+    )
+    run_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return run_id
+
+
+def get_active_smuggling_run(user_id: int):
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM smuggling_runs WHERE user_id = ? AND status = 'in_progress'",
+        (user_id,),
+    ).fetchone()
+    conn.close()
+    return row
+
+
+def get_smuggling_run(run_id: int):
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM smuggling_runs WHERE id = ?", (run_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def finish_smuggling_run(run_id: int, status: str):
+    """status: 'success' یا 'caught'"""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE smuggling_runs SET status = ? WHERE id = ?", (status, run_id)
+    )
+    conn.commit()
+    conn.close()
+
