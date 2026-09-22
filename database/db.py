@@ -1,6 +1,7 @@
 # database/db.py
 # اتصال به دیتابیس SQLite و ساخت جداول
 
+import os
 import sqlite3
 from config import DB_PATH
 
@@ -10,6 +11,12 @@ def get_connection():
     یک اتصال جدید به دیتابیس برمیگردونه.
     check_same_thread=False چون بات async هست و ممکنه از چند جا کوئری بزنیم.
     """
+    # اگه مسیر دیتابیس تو یه پوشه‌ی جداست (مثل /data روی Railway Volume)،
+    # مطمئن میشیم اون پوشه وجود داره وگرنه sqlite3 خطا میده.
+    db_dir = os.path.dirname(DB_PATH)
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
+
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
