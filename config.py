@@ -1,18 +1,24 @@
 # config.py
 # تنظیمات اصلی ربات جوجو
 
-BOT_TOKEN = "8488308082:AAFS5-AUN0ik0uRGKtm2WSW_M0WLUEtQ3cE"
+import os
+
+# توکن از environment variable خونده میشه (برای دیپلوی روی Railway یا هر پلتفرم دیگه)
+# اگه env variable ست نشده بود، از مقدار پیش‌فرض زیر استفاده میشه (برای اجرای لوکال/VPS)
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8488308082:AAFS5-AUN0ik0uRGKtm2WSW_M0WLUEtQ3cE")
 
 # آیدی عددی مالک ربات - فقط همین شخص میتونه ادمین اضافه/حذف کنه
-OWNER_ID = 5779467403  # امیر
+OWNER_ID = int(os.environ.get("OWNER_ID", "5779467403"))  # امیر
 
 # آیدی عددی ادمین‌های اولیه (نصب اولیه). ادمین‌های بعدی از طریق دستورات
 # پویا (/addadmin و /removeadmin) به دیتابیس اضافه/حذف میشن، نه اینجا.
 ADMIN_IDS = [
-    5779467403,  # امیر
+    OWNER_ID,  # امیر
 ]
 
-DB_PATH = "jojo_bot.db"
+# مسیر دیتابیس - روی Railway باید به یه Volume وصل بشه (مثلاً /data/jojo_bot.db)
+# تا با هر ری‌دیپلوی پاک نشه. اگه env variable ست نشده بود، همینجا کنار کد ذخیره میشه.
+DB_PATH = os.environ.get("DB_PATH", "jojo_bot.db")
 
 # نام جوجو و ارز پیش‌فرض
 DEFAULT_PET_NAME = "جوجو"
