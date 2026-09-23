@@ -3,6 +3,8 @@
 
 import asyncio
 import logging
+import os
+from aiohttp import web
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -27,6 +29,37 @@ from handlers.smuggling import router as smuggling_router
 from handlers.chance_spawn import router as chance_spawn_router
 
 logging.basicConfig(level=logging.INFO)
+
+
+async def _health_check(request):
+    """
+    یه اندپوینت خیلی ساده که فقط برای health-check پلتفرم‌های هاستینگ
+    (مثل Orbit/Flux، Railway و مشابه) استفاده میشه - نشون میده پروسه زندهست.
+    خود بات همچنان با polling کار میکنه؛ این وبسرور کاری با تلگرام نداره.
+    """
+    return web.Response(text="jojo bot is running ✅")
+
+
+async def _start_health_server():
+    """
+    یه وبسرور سبک روی پورتی که پلتفرم هاستینگ میده (env variable PORT) بالا میاره.
+    اگه PORT ست نشده بود (مثلاً روی VPS خودمون)، این وبسرور اصلاً استارت نمیشه
+    و فقط پولینگ عادی ادامه پیدا میکنه.
+    """
+    port_str = os.environ.get("PORT")
+    if not port_str:
+        return  # روی VPS/لوکال نیازی به وبسرور نیست
+
+    port = int(port_str)
+    app = web.Application()
+    app.router.add_get("/", _health_check)
+    app.router.add_get("/health", _health_check)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    logging.info(f"وبسرور health-check روی پورت {port} بالا اومد ✅")
 
 
 async def main():
@@ -55,6 +88,7 @@ async def main():
     dp.include_router(chance_spawn_router)
 
     logging.info("ربات جوجو استارت شد ✅")
+    await _start_health_server()
     await dp.start_polling(bot)
 
 
