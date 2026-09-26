@@ -215,15 +215,29 @@ def init_db():
     cur.execute("""
         CREATE TABLE IF NOT EXISTS factories (
             user_id INTEGER PRIMARY KEY,
-            level INTEGER DEFAULT 1,
-            workers_count INTEGER DEFAULT 0,
-            storage_capacity INTEGER DEFAULT 5000,
-            storage_used INTEGER DEFAULT 0,
-            device_level INTEGER DEFAULT 1,
-            current_product TEXT,
+            level INTEGER DEFAULT 1,               -- سطح کلی کارخونه
+            xp INTEGER DEFAULT 0,                  -- تجربه کارخونه (برای رسیدن به سطح بعدی)
+            workers_count INTEGER DEFAULT 0,       -- تعداد کارگران فعلی
+            seats_count INTEGER DEFAULT 3,         -- تعداد صندلی (ظرفیت کارگر) - جدا از سطح کارگر
+            seats_level INTEGER DEFAULT 1,         -- سطح صندلی‌ها (ارتقا = صندلی بیشتر)
+            storage_level INTEGER DEFAULT 1,       -- سطح انبار (جدا از سطح کلی کارخونه)
+            storage_capacity INTEGER DEFAULT 5000, -- ظرفیت کلی انبار (مجموع همه محصولات)
+            device_level INTEGER DEFAULT 1,        -- سطح دستگاه‌های تولید (سرعت تولید)
+            production_speed_seconds INTEGER DEFAULT 30,  -- چند ثانیه طول میکشه یک واحد تولید بشه
+            current_product TEXT,                  -- محصولی که الان در حال تولیده (کلید محصول)
             production_start_time INTEGER DEFAULT 0,
             production_amount INTEGER DEFAULT 0,
             created_at INTEGER DEFAULT (strftime('%s','now'))
+        )
+    """)
+
+    # موجودی هر محصول به تفکیک، داخل انبار کارخونه (کلید: user_id + product_key)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS factory_storage (
+            user_id INTEGER,
+            product_key TEXT,
+            amount INTEGER DEFAULT 0,
+            PRIMARY KEY (user_id, product_key)
         )
     """)
 
@@ -262,6 +276,18 @@ def init_db():
         )
     """)
 
+    # چه کسی صاحب واقعی هر پنل شخصی (بانک، کارخونه، پروفایل و...) هست.
+    # وقتی یه پیام با دکمه شیشه‌ای فرستاده میشه، آیدی فرستنده اینجا ثبت میشه؛
+    # هر کلیک روی دکمه‌های اون پیام، چک میشه که کلیک‌کننده همون صاحب باشه.
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS panel_owners (
+            chat_id INTEGER,
+            message_id INTEGER,
+            owner_user_id INTEGER,
+            PRIMARY KEY (chat_id, message_id)
+        )
+    """)
+
     conn.commit()
 
     # ---------------- Migration خودکار ----------------
@@ -274,6 +300,11 @@ def init_db():
     _add_column_if_missing(conn, "users", "last_fed_time", "INTEGER DEFAULT 0")
     _add_column_if_missing(conn, "bank_accounts", "total_interest_earned", "INTEGER DEFAULT 0")
     _add_column_if_missing(conn, "bank_accounts", "is_locked", "INTEGER DEFAULT 0")
+    _add_column_if_missing(conn, "factories", "xp", "INTEGER DEFAULT 0")
+    _add_column_if_missing(conn, "factories", "seats_count", "INTEGER DEFAULT 3")
+    _add_column_if_missing(conn, "factories", "seats_level", "INTEGER DEFAULT 1")
+    _add_column_if_missing(conn, "factories", "storage_level", "INTEGER DEFAULT 1")
+    _add_column_if_missing(conn, "factories", "production_speed_seconds", "INTEGER DEFAULT 30")
 
     conn.commit()
     conn.close()

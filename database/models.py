@@ -286,62 +286,129 @@ def get_factory(user_id: int):
     return row
 
 
-def create_factory_if_not_exists(user_id: int, base_storage: int):
+def create_factory_if_not_exists(user_id: int, base_storage: int, base_seats: int, base_speed: int):
     conn = get_connection()
     existing = conn.execute("SELECT 1 FROM factories WHERE user_id = ?", (user_id,)).fetchone()
     if existing:
         conn.close()
         return False
     conn.execute(
-        "INSERT INTO factories (user_id, storage_capacity) VALUES (?, ?)",
-        (user_id, base_storage),
+        """INSERT INTO factories (user_id, storage_capacity, seats_count, production_speed_seconds)
+           VALUES (?, ?, ?, ?)""",
+        (user_id, base_storage, base_seats, base_speed),
     )
     conn.commit()
     conn.close()
     return True
 
 
-def start_factory_production(user_id: int, product_name: str, amount: int, start_time: int):
+def get_factory_storage_items(user_id: int):
+    """لیست همه‌ی محصولات موجود تو انبار این کاربر (کلید محصول + مقدار)"""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT product_key, amount FROM factory_storage WHERE user_id = ? AND amount > 0",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def get_factory_total_storage_used(user_id: int) -> int:
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT COALESCE(SUM(amount), 0) as total FROM factory_storage WHERE user_id = ?",
+        (user_id,),
+    ).fetchone()
+    conn.close()
+    return row["total"]
+
+
+def start_factory_production(user_id: int, product_key: str, amount: int, start_time: int):
     conn = get_connection()
     conn.execute(
         """UPDATE factories
            SET current_product = ?, production_amount = ?, production_start_time = ?
            WHERE user_id = ?""",
-        (product_name, amount, start_time, user_id),
+        (product_key, amount, start_time, user_id),
     )
     conn.commit()
     conn.close()
 
 
-def collect_factory_production(user_id: int, produced_amount: int):
-    """محصول تولیدشده رو به انبار اضافه میکنه و خط تولید رو خالی میکنه"""
+def collect_factory_production(user_id: int, product_key: str, produced_amount: int, xp_gained: int):
+    """محصول تولیدشده رو به انبار (به تفکیک محصول) اضافه میکنه، خط تولید رو خالی میکنه و XP میده"""
     conn = get_connection()
+    conn.execute(
+        """INSERT INTO factory_storage (user_id, product_key, amount)
+           VALUES (?, ?, ?)
+           ON CONFLICT(user_id, product_key) DO UPDATE SET amount = amount + excluded.amount""",
+        (user_id, product_key, produced_amount),
+    )
     conn.execute(
         """UPDATE factories
-           SET storage_used = storage_used + ?, current_product = NULL,
-               production_amount = 0, production_start_time = 0
+           SET current_product = NULL, production_amount = 0, production_start_time = 0,
+               xp = xp + ?
            WHERE user_id = ?""",
-        (produced_amount, user_id),
+        (xp_gained, user_id),
     )
     conn.commit()
     conn.close()
 
 
-def sell_factory_storage(user_id: int, amount_to_sell: int):
+def sell_factory_product(user_id: int, product_key: str, amount_to_sell: int):
     conn = get_connection()
     conn.execute(
-        "UPDATE factories SET storage_used = storage_used - ? WHERE user_id = ?",
-        (amount_to_sell, user_id),
+        "UPDATE factory_storage SET amount = amount - ? WHERE user_id = ? AND product_key = ?",
+        (amount_to_sell, user_id, product_key),
     )
     conn.commit()
     conn.close()
 
 
-def upgrade_factory_level(user_id: int, new_level: int, new_storage_capacity: int):
+def sell_all_factory_storage(user_id: int):
+    """همه‌ی محصولات انبار رو صفر میکنه (بعد از فروش کلی)"""
+    conn = get_connection()
+    conn.execute("DELETE FROM factory_storage WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+
+def set_factory_level(user_id: int, new_level: int, remaining_xp: int):
+    """وقتی XP کافی جمع شد، سطح کارخونه بالا میره و XP اضافی نگه داشته میشه"""
     conn = get_connection()
     conn.execute(
-        "UPDATE factories SET level = ?, storage_capacity = ? WHERE user_id = ?",
-        (new_level, new_storage_capacity, user_id),
+        "UPDATE factories SET level = ?, xp = ? WHERE user_id = ?",
+        (new_level, remaining_xp, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def upgrade_factory_storage(user_id: int, new_storage_level: int, new_capacity: int):
+    conn = get_connection()
+    conn.execute(
+        "UPDATE factories SET storage_level = ?, storage_capacity = ? WHERE user_id = ?",
+        (new_storage_level, new_capacity, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def upgrade_factory_seats(user_id: int, new_seats_level: int, new_seats_count: int):
+    conn = get_connection()
+    conn.execute(
+        "UPDATE factories SET seats_level = ?, seats_count = ? WHERE user_id = ?",
+        (new_seats_level, new_seats_count, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def upgrade_factory_device(user_id: int, new_device_level: int, new_speed_seconds: int):
+    conn = get_connection()
+    conn.execute(
+        "UPDATE factories SET device_level = ?, production_speed_seconds = ? WHERE user_id = ?",
+        (new_device_level, new_speed_seconds, user_id),
     )
     conn.commit()
     conn.close()
@@ -351,6 +418,16 @@ def hire_factory_worker(user_id: int):
     conn = get_connection()
     conn.execute(
         "UPDATE factories SET workers_count = workers_count + 1 WHERE user_id = ?",
+        (user_id,),
+    )
+    conn.commit()
+    conn.close()
+
+
+def fire_factory_worker(user_id: int):
+    conn = get_connection()
+    conn.execute(
+        "UPDATE factories SET workers_count = MAX(workers_count - 1, 0) WHERE user_id = ?",
         (user_id,),
     )
     conn.commit()
@@ -468,4 +545,40 @@ def finish_smuggling_run(run_id: int, status: str):
     )
     conn.commit()
     conn.close()
+
+
+# ---------------- مالکیت پنل‌های شخصی (بانک، کارخونه و ...) ----------------
+# برای جلوگیری از اینکه کاربر دیگه‌ای تو گروه، روی دکمه‌های پنل شخصی یکی دیگه کلیک کنه.
+
+def set_panel_owner(chat_id: int, message_id: int, owner_user_id: int):
+    conn = get_connection()
+    conn.execute(
+        """INSERT INTO panel_owners (chat_id, message_id, owner_user_id)
+           VALUES (?, ?, ?)
+           ON CONFLICT(chat_id, message_id) DO UPDATE SET owner_user_id = excluded.owner_user_id""",
+        (chat_id, message_id, owner_user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_panel_owner(chat_id: int, message_id: int):
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT owner_user_id FROM panel_owners WHERE chat_id = ? AND message_id = ?",
+        (chat_id, message_id),
+    ).fetchone()
+    conn.close()
+    return row["owner_user_id"] if row else None
+
+
+def is_panel_owner(chat_id: int, message_id: int, user_id: int) -> bool:
+    """
+    اگه پیام تو دیتابیس مالک ثبت‌شده نداشت (مثلاً پیام‌های قدیمی قبل این آپدیت)،
+    به‌صورت پیش‌فرض اجازه میده - برای جلوگیری از قفل شدن غیرمنتظره‌ی پنل‌های قدیمی.
+    """
+    owner = get_panel_owner(chat_id, message_id)
+    if owner is None:
+        return True
+    return owner == user_id
 
