@@ -179,31 +179,66 @@ def feed_menu_kb() -> InlineKeyboardMarkup:
 
 # ---------------- کارخونه جوجویی ----------------
 
-def factory_menu_kb(has_factory: bool, is_producing: bool) -> InlineKeyboardMarkup:
+def factory_menu_kb(has_factory: bool, is_producing_ready: bool) -> InlineKeyboardMarkup:
     kb = []
     if not has_factory:
         kb.append([InlineKeyboardButton(text="🏭 ساخت کارخونه", callback_data="factory_create")])
         return InlineKeyboardMarkup(inline_keyboard=kb)
 
-    if is_producing:
+    if is_producing_ready:
         kb.append([InlineKeyboardButton(text="📦 برداشت محصول", callback_data="factory_collect")])
     else:
-        kb.append([InlineKeyboardButton(text="⚙️ شروع تولید", callback_data="factory_produce")])
+        kb.append([InlineKeyboardButton(text="⚙️ تولید", callback_data="factory_produce")])
 
-    kb.append([InlineKeyboardButton(text="💰 فروش انبار", callback_data="factory_sell")])
-    kb.append([InlineKeyboardButton(text="👷 استخدام کارگر", callback_data="factory_hire"),
-               InlineKeyboardButton(text="⬆️ ارتقا کارخونه", callback_data="factory_upgrade")])
+    kb.append([InlineKeyboardButton(text="📦 انبار", callback_data="factory_storage"),
+               InlineKeyboardButton(text="🐱 کارگران", callback_data="factory_workers")])
+    kb.append([InlineKeyboardButton(text="🖨 دستگاه‌های تولید", callback_data="factory_devices")])
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
-def factory_products_kb(products: dict) -> InlineKeyboardMarkup:
+def factory_products_kb(products: dict, factory_level: int) -> InlineKeyboardMarkup:
+    """لیست محصولات قابل تولید؛ محصولی که سطح کارخونه کافی نداره قفل نشون داده میشه"""
     kb = []
     for key, info in products.items():
-        kb.append([InlineKeyboardButton(
-            text=f"{key} — هزینه {info['cost']:,} 🪙",
-            callback_data=f"factory_makeprod_{key}",
-        )])
+        if factory_level >= info["min_factory_level"]:
+            text = f"{info['emoji']} تولیدی {info['name']}"
+            callback = f"factory_makeprod_{key}"
+        else:
+            text = f"🔒 {info['name']} (سطح {info['min_factory_level']})"
+            callback = "factory_locked_product"
+        kb.append([InlineKeyboardButton(text=text, callback_data=callback)])
     kb.append([InlineKeyboardButton(text="🔙 بازگشت", callback_data="factory_back")])
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+def factory_storage_kb(has_items: bool) -> InlineKeyboardMarkup:
+    kb = []
+    if has_items:
+        kb.append([InlineKeyboardButton(text="💰 فروش کل انبار", callback_data="factory_sell_all")])
+    kb.append([InlineKeyboardButton(text="⭐ ارتقا انبار کارخونه", callback_data="factory_upgrade_storage")])
+    kb.append([InlineKeyboardButton(text="🔙 بازگشت", callback_data="factory_back")])
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+def factory_workers_kb(can_hire: bool, can_fire: bool) -> InlineKeyboardMarkup:
+    kb = []
+    row = []
+    if can_hire:
+        row.append(InlineKeyboardButton(text="📝 استخدام کارگر", callback_data="factory_hire"))
+    if can_fire:
+        row.append(InlineKeyboardButton(text="🚫 اخراج کارگر", callback_data="factory_fire"))
+    if row:
+        kb.append(row)
+    kb.append([InlineKeyboardButton(text="⭐ ارتقا صندلی کارگران", callback_data="factory_upgrade_seats")])
+    kb.append([InlineKeyboardButton(text="🔙 بازگشت", callback_data="factory_back")])
+    return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+def factory_devices_kb() -> InlineKeyboardMarkup:
+    kb = [
+        [InlineKeyboardButton(text="⭐ ارتقا دستگاه‌های تولید", callback_data="factory_upgrade_device")],
+        [InlineKeyboardButton(text="🔙 بازگشت", callback_data="factory_back")],
+    ]
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
