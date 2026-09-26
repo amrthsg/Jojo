@@ -96,18 +96,54 @@ HUNGER_INTERVAL_SECONDS = 4 * 3600  # هر 4 ساعت جوجو گرسنه میش
 FEED_COST = 150                      # هزینه‌ی هر بار غذا دادن دستی (بنویس «غذا»)
 
 # ------- کارخونه جوجویی -------
-FACTORY_MIN_LEVEL = 7
-FACTORY_BASE_STORAGE = 5000
-FACTORY_PRODUCTION_TIME_SECONDS = 24  # زمان پایه‌ی تولید هر محصول
-FACTORY_UPGRADE_COST = 100_000
-FACTORY_WORKER_HIRE_COST = 5_000
-FACTORY_MAX_WORKERS = 10
+FACTORY_MIN_LEVEL = 7          # حداقل سطح جوجو برای باز شدن کارخونه
+FACTORY_MAX_FACTORY_LEVEL = 30  # سقف سطح کارخونه (نمایش به رومی مثل XVII)
 
-# محصولات قابل تولید در کارخونه: (نام، هزینه تولید، ارزش فروش)
+FACTORY_BASE_STORAGE = 5000
+FACTORY_STORAGE_GROWTH_PER_LEVEL = 5000   # هر سطح انبار، این مقدار به ظرفیت اضافه میشه
+FACTORY_STORAGE_UPGRADE_BASE_COST = 250_000
+FACTORY_STORAGE_UPGRADE_COST_STEP = 75_000  # هر سطح، هزینه ارتقای بعدی بیشتر میشه
+
+FACTORY_BASE_SEATS = 3
+FACTORY_SEATS_GROWTH_PER_LEVEL = 1        # هر ارتقای صندلی، این مقدار صندلی اضافه میشه
+FACTORY_SEATS_UPGRADE_BASE_COST = 325_000
+FACTORY_SEATS_UPGRADE_COST_STEP = 100_000
+FACTORY_WORKER_HIRE_COST = 5_000
+FACTORY_WORKER_FIRE_REFUND_RATIO = 0.5     # درصدی از هزینه استخدام که موقع اخراج برمیگرده
+
+FACTORY_BASE_PRODUCTION_SPEED_SECONDS = 30  # زمان پایه تولید هر واحد محصول
+FACTORY_DEVICE_SPEED_REDUCTION_PER_LEVEL = 2  # هر ارتقای دستگاه، این مقدار (ثانیه) سریع‌تر میشه
+FACTORY_DEVICE_MIN_SPEED_SECONDS = 4         # حداقل زمان تولید (سقف سرعت)
+FACTORY_DEVICE_UPGRADE_BASE_COST = 325_000
+FACTORY_DEVICE_UPGRADE_COST_STEP = 100_000
+
+# تجربه‌ی لازم برای رسیدن از هر سطح کارخونه به سطح بعدی (سطح: XP لازم)
+FACTORY_XP_PER_LEVEL_BASE = 50_000
+FACTORY_XP_PER_LEVEL_STEP = 5_000   # هر سطح، XP لازم برای سطح بعدی این مقدار بیشتر میشه
+
+# محصولات قابل تولید در کارخونه: کلید، نام نمایشی، ایموجی، حداقل سطح کارخونه لازم،
+# هزینه تولید هر واحد، قیمت فروش هر واحد، و XP کارخونه‌ای که هر واحد تولیدشده میده
 FACTORY_PRODUCTS = {
-    "آبنبات": {"cost": 50, "sell_price": 90},
-    "شکلات": {"cost": 100, "sell_price": 180},
-    "آدامس": {"cost": 30, "sell_price": 55},
+    "candy": {
+        "name": "آبنبات", "emoji": "🍬", "min_factory_level": 1,
+        "cost": 50, "sell_price": 90, "xp_per_unit": 5,
+    },
+    "cake": {
+        "name": "کیک", "emoji": "🍰", "min_factory_level": 1,
+        "cost": 120, "sell_price": 210, "xp_per_unit": 10,
+    },
+    "tech": {
+        "name": "تکنولوژی", "emoji": "💾", "min_factory_level": 10,
+        "cost": 800, "sell_price": 1_400, "xp_per_unit": 40,
+    },
+    "car": {
+        "name": "خودرو", "emoji": "🚗", "min_factory_level": 18,
+        "cost": 5_000, "sell_price": 8_800, "xp_per_unit": 150,
+    },
+    "airplane": {
+        "name": "هواپیما", "emoji": "✈️", "min_factory_level": 25,
+        "cost": 25_000, "sell_price": 44_000, "xp_per_unit": 600,
+    },
 }
 
 # ------- شهر جوجویی (گروهی) -------
