@@ -6,7 +6,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
-from database.models import get_user, add_meow_points
+from database.models import get_user, add_meow_points, set_panel_owner, is_panel_owner
 from database.bank_models import (
     get_bank_account,
     open_bank_account,
@@ -51,6 +51,19 @@ class BankStates(StatesGroup):
     waiting_transfer_card = State()
     waiting_transfer_amount = State()
     waiting_loan_amount = State()
+
+
+async def _guard_owner(callback: CallbackQuery) -> bool:
+    """
+    چک میکنه فقط صاحب اصلی پنل بانک بتونه روی دکمه‌هاش کلیک کنه.
+    اگه یه کاربر دیگه (تو گروه) روی این دکمه‌ها بزنه، رد میشه.
+    برمیگردونه True اگه اجازه داشت، False اگه نداشت (و خودش پیام رد رو نشون میده).
+    """
+    owner_ok = is_panel_owner(callback.message.chat.id, callback.message.message_id, callback.from_user.id)
+    if not owner_ok:
+        await callback.answer("⛔️ این پنل برای شما نیست جوجو 🐤", show_alert=True)
+        return False
+    return True
 
 
 def _format_bank_text(user, account, interest_applied: int) -> str:
@@ -103,9 +116,11 @@ async def _send_bank_menu(message_or_callback, user_id: int, edit: bool = False)
         card_number = open_bank_account(user_id)
         text = f"🎉 حساب بانکی باز شد!\n💳 شماره حساب شما: <code>{card_number}</code>"
         if edit:
-            await message_or_callback.message.edit_text(text, parse_mode="HTML", reply_markup=bank_menu_kb())
+            sent = await message_or_callback.message.edit_text(text, parse_mode="HTML", reply_markup=bank_menu_kb())
+            set_panel_owner(message_or_callback.message.chat.id, message_or_callback.message.message_id, user_id)
         else:
-            await message_or_callback.answer(text, parse_mode="HTML", reply_markup=bank_menu_kb())
+            sent = await message_or_callback.answer(text, parse_mode="HTML", reply_markup=bank_menu_kb())
+            set_panel_owner(sent.chat.id, sent.message_id, user_id)
         return
 
     # چک و کسر خودکار قسط وام، اگه سررسید شده باشه
@@ -120,8 +135,10 @@ async def _send_bank_menu(message_or_callback, user_id: int, edit: bool = False)
 
     if edit:
         await message_or_callback.message.edit_text(text, parse_mode="HTML", reply_markup=bank_menu_kb())
+        set_panel_owner(message_or_callback.message.chat.id, message_or_callback.message.message_id, user_id)
     else:
-        await message_or_callback.answer(text, parse_mode="HTML", reply_markup=bank_menu_kb())
+        sent = await message_or_callback.answer(text, parse_mode="HTML", reply_markup=bank_menu_kb())
+        set_panel_owner(sent.chat.id, sent.message_id, user_id)
 
 
 @router.message(F.text == "بانک")
@@ -131,6 +148,8 @@ async def handle_bank_menu(message: Message):
 
 @router.callback_query(F.data == "bank_balance")
 async def cb_bank_balance(callback: CallbackQuery):
+    if not await _guard_owner(callback):
+        return
     await _send_bank_menu(callback, callback.from_user.id, edit=True)
     await callback.answer()
 
@@ -139,6 +158,8 @@ async def cb_bank_balance(callback: CallbackQuery):
 
 @router.callback_query(F.data == "bank_deposit")
 async def cb_bank_deposit(callback: CallbackQuery):
+    if not await _guard_owner(callback):
+        return
     await callback.message.edit_text(
         "⬆️ چند درصد از موجودی کیف پولت رو می‌خوای واریز کنی؟",
         reply_markup=bank_percent_kb("deposit"),
@@ -148,6 +169,8 @@ async def cb_bank_deposit(callback: CallbackQuery):
 
 @router.callback_query(F.data == "bank_withdraw")
 async def cb_bank_withdraw(callback: CallbackQuery):
+    if not await _guard_owner(callback):
+        return
     await callback.message.edit_text(
         "⬇️ چند درصد از موجودی بانکت رو می‌خوای برداشت کنی؟",
         reply_markup=bank_percent_kb("withdraw"),
@@ -157,6 +180,8 @@ async def cb_bank_withdraw(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("bankpct_"))
 async def cb_bank_percent(callback: CallbackQuery, state: FSMContext):
+    if not await _guard_owner(callback):
+        return
     _, action, pct = callback.data.split("_")
     user_id = callback.from_user.id
 
@@ -240,6 +265,8 @@ async def process_withdraw_custom(message: Message, state: FSMContext):
 
 @router.callback_query(F.data == "bank_transfer")
 async def cb_bank_transfer(callback: CallbackQuery, state: FSMContext):
+    if not await _guard_owner(callback):
+        return
     await callback.message.edit_text("💳 شماره حساب مقصد رو بفرست:", reply_markup=cancel_kb())
     await state.set_state(BankStates.waiting_transfer_card)
     await callback.answer()
@@ -258,6 +285,8 @@ async def process_transfer_card(message: Message, state: FSMContext):
 
 @router.callback_query(F.data.startswith("transferpct_"))
 async def cb_transfer_percent(callback: CallbackQuery, state: FSMContext):
+    if not await _guard_owner(callback):
+        return
     pct = callback.data.replace("transferpct_", "")
     data = await state.get_data()
     to_card = data.get("to_card")
@@ -319,6 +348,8 @@ async def process_transfer_amount_custom(message: Message, state: FSMContext):
 
 @router.callback_query(F.data == "bank_change_number")
 async def cb_change_card_number(callback: CallbackQuery):
+    if not await _guard_owner(callback):
+        return
     success, msg, new_number = change_card_number(callback.from_user.id, CARD_NUMBER_CHANGE_COST)
     if success:
         await callback.message.answer(f"✅ شماره حساب جدید: <code>{new_number}</code>", parse_mode="HTML")
@@ -331,6 +362,8 @@ async def cb_change_card_number(callback: CallbackQuery):
 
 @router.callback_query(F.data == "bank_transactions")
 async def cb_bank_transactions(callback: CallbackQuery):
+    if not await _guard_owner(callback):
+        return
     user_id = callback.from_user.id
     txs = get_bank_transactions(user_id, limit=10)
 
@@ -351,6 +384,8 @@ async def cb_bank_transactions(callback: CallbackQuery):
 
 @router.callback_query(F.data == "bank_lock")
 async def cb_bank_lock(callback: CallbackQuery):
+    if not await _guard_owner(callback):
+        return
     account = get_bank_account(callback.from_user.id)
     if not account:
         await callback.answer("❌ حساب بانکی نداری.", show_alert=True)
@@ -370,6 +405,8 @@ async def cb_bank_lock(callback: CallbackQuery):
 
 @router.callback_query(F.data == "bank_lock_confirm")
 async def cb_bank_lock_confirm(callback: CallbackQuery):
+    if not await _guard_owner(callback):
+        return
     account = get_bank_account(callback.from_user.id)
     if not account:
         await callback.answer("❌ حساب بانکی نداری.", show_alert=True)
@@ -385,6 +422,8 @@ async def cb_bank_lock_confirm(callback: CallbackQuery):
 
 @router.callback_query(F.data == "bank_lock_cancel")
 async def cb_bank_lock_cancel(callback: CallbackQuery):
+    if not await _guard_owner(callback):
+        return
     await _send_bank_menu(callback, callback.from_user.id, edit=True)
     await callback.answer()
 
@@ -393,6 +432,8 @@ async def cb_bank_lock_cancel(callback: CallbackQuery):
 
 @router.callback_query(F.data == "bank_loan_request")
 async def cb_loan_request(callback: CallbackQuery, state: FSMContext):
+    if not await _guard_owner(callback):
+        return
     user_id = callback.from_user.id
     active_loan = get_active_loan(user_id)
 

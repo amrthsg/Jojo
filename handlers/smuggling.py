@@ -15,6 +15,8 @@ from database.models import (
     get_active_smuggling_run,
     get_smuggling_run,
     finish_smuggling_run,
+    set_panel_owner,
+    is_panel_owner,
 )
 from keyboards.main_kb import smuggling_menu_kb, smuggling_chick_count_kb
 from utils.leveling import format_time
@@ -30,6 +32,14 @@ from config import (
 )
 
 router = Router()
+
+
+async def _guard_owner(callback: CallbackQuery) -> bool:
+    owner_ok = is_panel_owner(callback.message.chat.id, callback.message.message_id, callback.from_user.id)
+    if not owner_ok:
+        await callback.answer("⛔️ این پنل برای شما نیست جوجو 🐤", show_alert=True)
+        return False
+    return True
 
 
 def _run_status_text(run) -> str:
@@ -69,15 +79,18 @@ async def handle_smuggling_menu(message: Message):
 
     run = get_active_smuggling_run(message.from_user.id)
 
-    await message.answer(
+    sent = await message.answer(
         _run_status_text(run),
         reply_markup=smuggling_menu_kb(has_active_run=bool(run)),
         parse_mode="HTML",
     )
+    set_panel_owner(sent.chat.id, sent.message_id, message.from_user.id)
 
 
 @router.callback_query(F.data == "smuggling_start")
 async def cb_smuggling_start(callback: CallbackQuery):
+    if not await _guard_owner(callback):
+        return
     user = get_user(callback.from_user.id)
     if not user or user["level"] < SMUGGLING_MIN_LEVEL:
         await callback.answer(f"❌ برای قاچاق باید حداقل سطح {SMUGGLING_MIN_LEVEL} باشی.", show_alert=True)
@@ -97,6 +110,8 @@ async def cb_smuggling_start(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("smuggle_go_"))
 async def cb_smuggling_go(callback: CallbackQuery):
+    if not await _guard_owner(callback):
+        return
     chick_count = int(callback.data.replace("smuggle_go_", ""))
     user_id = callback.from_user.id
 
@@ -158,6 +173,8 @@ async def _resolve_smuggling_after_delay(bot, run_id, user_id, chick_count, rewa
 
 @router.callback_query(F.data == "smuggling_status")
 async def cb_smuggling_status(callback: CallbackQuery):
+    if not await _guard_owner(callback):
+        return
     run = get_active_smuggling_run(callback.from_user.id)
     await callback.message.edit_text(
         _run_status_text(run),
@@ -169,6 +186,8 @@ async def cb_smuggling_status(callback: CallbackQuery):
 
 @router.callback_query(F.data == "smuggling_back")
 async def cb_smuggling_back(callback: CallbackQuery):
+    if not await _guard_owner(callback):
+        return
     run = get_active_smuggling_run(callback.from_user.id)
     await callback.message.edit_text(
         _run_status_text(run),

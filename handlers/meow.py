@@ -40,6 +40,7 @@ from config import (
     FEED_COST,
 )
 from utils.amount_parser import parse_amount
+from utils.premium_emoji import build_premium_entities
 
 router = Router()
 
@@ -103,7 +104,7 @@ async def process_meow(message: Message):
     new_exp = user["exp"] + 1
     new_level, leveled_up = check_level_up(user["level"], new_exp)
 
-    level_up_text = ""
+    level_up_text_plain = ""
     if leveled_up:
         new_rank = (new_level - 1) // 5 + 1
         new_capacity = get_capacity_for_rank(new_rank)
@@ -112,21 +113,28 @@ async def process_meow(message: Message):
         add_meow_points(user_id, bonus)
         set_level(user_id, new_level, new_capacity, new_rank)
 
-        level_up_text = (
-            f"\n\n🎉 <b>{user['pet_name']} به سطح {new_level} رسید!</b>\n"
+        level_up_text_plain = (
+            f"\n\n🎉 {user['pet_name']} به سطح {new_level} رسید!\n"
             f"🎁 جایزه ارتقا: {bonus:,} {CURRENCY_EMOJI}"
         )
 
     new_cooldown = get_cooldown_seconds(new_level)
 
     text = (
-        f"<b>{user['pet_name']}</b> {reward:,} {CURRENCY_NAME} گرفتی 🐤\n"
+        f"{user['pet_name']} {reward:,} {CURRENCY_NAME} گرفتی 🐤\n"
         f"💰 {CURRENCY_NAME} هات : {new_balance:,} {CURRENCY_EMOJI}\n"
         f"⏳ بعد از {format_time(new_cooldown)} میتونی دوباره جیک جیک کنی"
-        f"{level_up_text}"
+        f"{level_up_text_plain}"
     )
 
-    await message.answer(text, parse_mode="HTML")
+    # نکته: چون entity های سفارشی (ایموجی پرمیوم) با parse_mode=HTML با هم جمع نمیشن،
+    # این پیام بدون تگ HTML و فقط با entities فرستاده میشه.
+    text, emoji_entities = build_premium_entities(
+        text,
+        [("🐤", "chick"), ("💰", "money_bag"), (CURRENCY_EMOJI, "coin"), ("⏳", "clock")],
+    )
+
+    await message.answer(text, entities=emoji_entities or None)
 
 
 @router.message(F.text == JIK_TRIGGER)
@@ -134,6 +142,16 @@ async def handle_jik_jik(message: Message):
     """
     محرک اصلی: کاربر باید دقیقاً کلمه «جیک جیک» رو تایپ کنه تا پوینت بگیره.
     هم تو چت خصوصی هم تو گروه فعاله.
+    """
+    await process_meow(message)
+
+
+@router.message(F.sticker & F.sticker.is_premium)
+async def handle_premium_sticker_jik(message: Message):
+    """
+    وقتی کاربر یه استیکر پرمیوم تلگرام (استیکر متحرک ویژه‌ی اکانت‌های پرمیوم) بفرسته،
+    دقیقاً مثل نوشتن «جیک جیک» حساب میشه و همون پاداش/کول‌داون رو داره.
+    استیکرهای معمولی (غیرپرمیوم) این هندلر رو صدا نمیزنن.
     """
     await process_meow(message)
 
