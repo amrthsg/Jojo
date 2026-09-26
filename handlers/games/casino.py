@@ -10,9 +10,10 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
-from database.models import get_user, add_meow_points
+from database.models import get_user, add_meow_points, set_panel_owner, is_panel_owner
 from database.db import get_connection
 from keyboards.main_kb import casino_menu_kb, casino_bet_amount_kb, casino_join_kb, cancel_kb
+from utils.premium_emoji import build_premium_entities
 from config import (
     CASINO_MIN_LEVEL,
     CASINO_TABLE_MIN_LEVEL,
@@ -29,12 +30,25 @@ class CasinoStates(StatesGroup):
     waiting_custom_bet = State()
 
 
-def _casino_intro_text() -> str:
-    return (
-        "🎰 <b>کازینو جوجو</b>\n\n"
+async def _guard_owner(callback: CallbackQuery) -> bool:
+    """
+    فقط برای دکمه‌های شخصی (ساخت میز، انتخاب مبلغ) - نه برای «پیوستن به میز»
+    که باید برای همه‌ی کاربرای گروه باز باشه.
+    """
+    owner_ok = is_panel_owner(callback.message.chat.id, callback.message.message_id, callback.from_user.id)
+    if not owner_ok:
+        await callback.answer("⛔️ این پنل برای شما نیست جوجو 🐤", show_alert=True)
+        return False
+    return True
+
+
+def _casino_intro_text():
+    text = (
+        "🎰 کازینو جوجو\n\n"
         f"بین {CASINO_MIN_PLAYERS} تا {CASINO_MAX_PLAYERS} نفر میتونن با هم شرط ببندن.\n"
         f"همه پول رو وسط میذارن، یک نفر تصادفی همه رو میبره!"
     )
+    return build_premium_entities(text, [("🎰", "casino")])
 
 
 @router.message(F.text == "کازینو")
@@ -52,11 +66,15 @@ async def handle_casino_menu(message: Message):
         await message.answer(f"🎰 برای بازی کازینو باید حداقل سطح {CASINO_MIN_LEVEL} باشی.")
         return
 
-    await message.answer(_casino_intro_text(), reply_markup=casino_menu_kb(), parse_mode="HTML")
+    text, entities = _casino_intro_text()
+    sent = await message.answer(text, entities=entities or None, reply_markup=casino_menu_kb())
+    set_panel_owner(sent.chat.id, sent.message_id, message.from_user.id)
 
 
 @router.callback_query(F.data == "casino_create")
 async def cb_casino_create(callback: CallbackQuery):
+    if not await _guard_owner(callback):
+        return
     user = get_user(callback.from_user.id)
     if not user:
         await callback.answer("اول باید /start بزنی 🐤", show_alert=True)
@@ -70,17 +88,18 @@ async def cb_casino_create(callback: CallbackQuery):
         await callback.answer(f"❌ برای ساخت میز کازینو باید حداقل سطح {CASINO_TABLE_MIN_LEVEL} باشی.", show_alert=True)
         return
 
-    await callback.message.edit_text(
-        "🎰 <b>مبلغ شرط رو انتخاب کن</b>",
-        reply_markup=casino_bet_amount_kb(),
-        parse_mode="HTML",
-    )
+    text = "🎰 مبلغ شرط رو انتخاب کن"
+    text, entities = build_premium_entities(text, [("🎰", "casino")])
+    await callback.message.edit_text(text, entities=entities or None, reply_markup=casino_bet_amount_kb())
     await callback.answer()
 
 
 @router.callback_query(F.data == "casino_back")
 async def cb_casino_back(callback: CallbackQuery):
-    await callback.message.edit_text(_casino_intro_text(), reply_markup=casino_menu_kb(), parse_mode="HTML")
+    if not await _guard_owner(callback):
+        return
+    text, entities = _casino_intro_text()
+    await callback.message.edit_text(text, entities=entities or None, reply_markup=casino_menu_kb())
     await callback.answer()
 
 
@@ -111,6 +130,8 @@ async def _create_casino_table(bot, chat_id: int, user_id: int, amount: int):
 
 @router.callback_query(F.data.startswith("casinobet_") & ~F.data.endswith("custom"))
 async def cb_casino_bet_amount(callback: CallbackQuery):
+    if not await _guard_owner(callback):
+        return
     amount = int(callback.data.replace("casinobet_", ""))
     user_id = callback.from_user.id
     chat_id = callback.message.chat.id
@@ -121,13 +142,15 @@ async def cb_casino_bet_amount(callback: CallbackQuery):
         return
 
     await callback.answer("✅ میز کازینو ساخته شد!", show_alert=True)
-    await callback.message.edit_text(
+    text = (
         f"🎰 میز کازینو #{table_id} با شرط {amount:,} {CURRENCY_EMOJI} باز شد!\n"
         f"👥 بازیکنان: 1 نفر\n"
         f"⏳ {CASINO_JOIN_WINDOW_SECONDS} ثانیه فرصت برای پیوستن بقیه.\n\n"
-        f"حداقل {CASINO_MIN_PLAYERS} نفر لازمه تا بازی شروع بشه.",
-        reply_markup=casino_join_kb(table_id),
+        f"حداقل {CASINO_MIN_PLAYERS} نفر لازمه تا بازی شروع بشه."
     )
+    text, entities = build_premium_entities(text, [("🎰", "casino"), (CURRENCY_EMOJI, "coin"), ("⏳", "clock")])
+    await callback.message.edit_text(text, entities=entities or None, reply_markup=casino_join_kb(table_id))
+    # این پیام (دعوت به میز) عمداً مالکیت‌دار نمیشه، چون هر کسی تو گروه باید بتونه بپیونده.
 
     asyncio.create_task(
         _resolve_casino_after_delay(callback.bot, table_id, chat_id, callback.message.message_id)
@@ -136,6 +159,8 @@ async def cb_casino_bet_amount(callback: CallbackQuery):
 
 @router.callback_query(F.data == "casinobet_custom")
 async def cb_casino_bet_custom(callback: CallbackQuery, state: FSMContext):
+    if not await _guard_owner(callback):
+        return
     await state.set_state(CasinoStates.waiting_custom_bet)
     await state.update_data(chat_id=callback.message.chat.id)
     await callback.message.edit_text(
