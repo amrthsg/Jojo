@@ -109,7 +109,7 @@ def _factory_main_text(user, factory):
             f"هنوز کارخونه نساختی. برای شروع، سطح {FACTORY_MIN_LEVEL} لازمه.\n"
             "با ساخت کارخونه میتونی محصول تولید کنی و بفروشی."
         )
-        return build_premium_entities(text, [("🏭", "factory")])
+        return build_premium_entities(text, [])
 
     level_roman = to_roman(factory["level"])
     xp_needed = _xp_needed_for_level(factory["level"])
@@ -150,8 +150,7 @@ def _factory_main_text(user, factory):
 
     text = "\n".join(lines)
     placeholders = [
-        ("🏭", "factory"), ("🐱", "worker"), ("🧳", "storage"), ("⭐", "star"),
-        ("🖨", "gear"), ("⏳", "clock"), ("🌟", "star"), ("⚡️", "xp"),
+        ("⭐", "star"), ("🌟", "star2"), ("⏳", "clock"),
     ]
     return build_premium_entities(text, placeholders)
 
@@ -456,7 +455,7 @@ def _factory_workers_text(factory):
     lines.append(f"هزینه استخدام هر کارگر : {FACTORY_WORKER_HIRE_COST:,} 💰")
 
     text = "\n".join(lines)
-    return build_premium_entities(text, [("🐱", "worker"), ("🪑", "seat"), ("⭐", "star"), ("💰", "money_bag")])
+    return build_premium_entities(text, [("⭐", "star"), ("💰", "money_bag")])
 
 
 @router.callback_query(F.data == "factory_workers")
@@ -594,7 +593,7 @@ def _factory_devices_text(factory):
         lines.append("\n🏆 دستگاه‌ها به بالاترین سرعت ممکن رسیدن.")
 
     text = "\n".join(lines)
-    return build_premium_entities(text, [("🖨", "gear"), ("⭐", "star"), ("⏳", "clock"), ("✨", "sparkle"), ("💰", "money_bag")])
+    return build_premium_entities(text, [("⭐", "star"), ("⏳", "clock"), ("✨", "sparkle"), ("💰", "money_bag")])
 
 
 @router.callback_query(F.data == "factory_devices")

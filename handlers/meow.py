@@ -131,7 +131,7 @@ async def process_meow(message: Message):
     # این پیام بدون تگ HTML و فقط با entities فرستاده میشه.
     text, emoji_entities = build_premium_entities(
         text,
-        [("🐤", "chick"), ("💰", "money_bag"), (CURRENCY_EMOJI, "coin"), ("⏳", "clock")],
+        [("💰", "money_bag"), ("⏳", "clock")],
     )
 
     await message.answer(text, entities=emoji_entities or None)
@@ -173,13 +173,14 @@ async def handle_level_info(message: Message):
         exp_text = f"تا سطح بعدی: {remaining} جیک مونده"
 
     text = (
-        f"⭐ <b>سطح و تجربه {user['pet_name']}</b>\n\n"
+        f"⭐ سطح و تجربه {user['pet_name']}\n\n"
         f"🌟 سطح فعلی: {user['level']} / {MAX_LEVEL}\n"
         f"🐤 مجموع جیک: {user['exp']:,}\n"
         f"👑 مقام: {user['rank_level']}\n\n"
         f"{exp_text}"
     )
-    await message.answer(text, parse_mode="HTML")
+    text, entities = build_premium_entities(text, [("⭐", "star"), ("🌟", "star2")])
+    await message.answer(text, entities=entities or None)
 
 
 @router.message(F.text.in_({"پوینت", "جیک پوینت", "موجودی"}))
@@ -192,10 +193,11 @@ async def handle_points_info(message: Message):
         return
 
     text = (
-        f"💰 <b>{CURRENCY_NAME} های {user['pet_name']}</b>\n\n"
+        f"💰 {CURRENCY_NAME} های {user['pet_name']}\n\n"
         f"🪙 موجودی: {user['meow_points']:,} {CURRENCY_EMOJI}\n"
     )
-    await message.answer(text, parse_mode="HTML")
+    text, entities = build_premium_entities(text, [("💰", "money_bag")])
+    await message.answer(text, entities=entities or None)
 
 
 @router.message(F.text.in_({"پروفایل", "پروفایل جوجو", "جیک هاش"}))
@@ -223,22 +225,23 @@ async def handle_profile(message: Message):
     username_line = f"🔗 @{target_tg_user.username}\n" if target_tg_user.username else ""
 
     text = (
-        f"👤 <b>{full_name}</b>\n"
+        f"👤 {full_name}\n"
         f"{username_line}"
-        f"🆔 آیدی عددی: <code>{target_id}</code>\n\n"
-        f"🐤 <b>پروفایل {user['pet_name']}</b>\n\n"
+        f"🆔 آیدی عددی: {target_id}\n\n"
+        f"🐤 پروفایل {user['pet_name']}\n\n"
         f"🏷 نام جوجو: {user['pet_name']}\n"
         f"👑 مقام: {user['rank_level']}\n"
         f"⭐ سطح: {user['level']} / {MAX_LEVEL}\n\n"
         f"🪙 موجودی: {user['meow_points']:,} {CURRENCY_EMOJI}\n"
     )
+    text, entities = build_premium_entities(text, [("⭐", "star")])
 
     # تلاش برای گرفتن عکس پروفایل واقعی تلگرام کاربر و فرستادن به همراه متن
     try:
         photos = await message.bot.get_user_profile_photos(target_id, limit=1)
         if photos.total_count > 0:
             photo_file_id = photos.photos[0][-1].file_id  # بزرگترین سایز عکس
-            await message.answer_photo(photo_file_id, caption=text, parse_mode="HTML")
+            await message.answer_photo(photo_file_id, caption=text, caption_entities=entities or None)
             return
         else:
             logging.info(f"کاربر {target_id} عکس پروفایل تلگرام نداره (total_count=0)")
@@ -250,25 +253,27 @@ async def handle_profile(message: Message):
     try:
         if os.path.exists(DEFAULT_PROFILE_PHOTO_PATH):
             photo = FSInputFile(DEFAULT_PROFILE_PHOTO_PATH)
-            await message.answer_photo(photo, caption=text, parse_mode="HTML")
+            await message.answer_photo(photo, caption=text, caption_entities=entities or None)
             return
     except Exception:
         pass  # اگه فایل پیش‌فرض هم در دسترس نبود، فقط متن رو میفرستیم
 
-    await message.answer(text, parse_mode="HTML")
+    await message.answer(text, entities=entities or None)
 
 
-def _food_menu_text(user) -> str:
+def _food_menu_text(user):
     if is_pet_hungry(user["user_id"], HUNGER_INTERVAL_SECONDS):
-        return (
-            f"🍽 <b>غذای {user['pet_name']}</b>\n\n"
+        text = (
+            f"🍽 غذای {user['pet_name']}\n\n"
             f"{user['pet_name']} گرسنه‌ست!\n"
             f"هزینه سیر کردن: {FEED_COST:,} {CURRENCY_EMOJI}"
         )
-    return (
-        f"🍽 <b>غذای {user['pet_name']}</b>\n\n"
-        f"😋 {user['pet_name']} الان سیره، نیازی به غذا نداره."
-    )
+    else:
+        text = (
+            f"🍽 غذای {user['pet_name']}\n\n"
+            f"😋 {user['pet_name']} الان سیره، نیازی به غذا نداره."
+        )
+    return build_premium_entities(text, [("🍽", "food")])
 
 
 @router.message(F.text == "غذا")
@@ -280,11 +285,8 @@ async def handle_feed_menu(message: Message):
         await message.answer("اول باید /start بزنی 🐤")
         return
 
-    await message.answer(
-        _food_menu_text(user),
-        reply_markup=feed_menu_kb(),
-        parse_mode="HTML",
-    )
+    text, entities = _food_menu_text(user)
+    await message.answer(text, entities=entities or None, reply_markup=feed_menu_kb())
 
 
 @router.callback_query(F.data == "feed_pet")
@@ -309,11 +311,8 @@ async def cb_feed_pet(callback: CallbackQuery):
 
     user = get_user(user_id)
     await callback.answer(f"🍽 {user['pet_name']} رو سیر کردی! حالا می‌تونه دوباره جیک کنه.", show_alert=True)
-    await callback.message.edit_text(
-        _food_menu_text(user),
-        reply_markup=feed_menu_kb(),
-        parse_mode="HTML",
-    )
+    text, entities = _food_menu_text(user)
+    await callback.message.edit_text(text, entities=entities or None, reply_markup=feed_menu_kb())
 
 
 @router.message(F.text.startswith("تغییر نام "))

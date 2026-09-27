@@ -8,6 +8,7 @@ from aiogram.types import Message, CallbackQuery
 from database.db import get_connection
 from database.models import get_user, add_meow_points
 from keyboards.main_kb import market_menu_kb
+from utils.premium_emoji import build_premium_entities
 from config import CURRENCY_EMOJI
 
 router = Router()
@@ -41,11 +42,13 @@ async def handle_market(message: Message):
     items = conn.execute("SELECT * FROM market_items").fetchall()
     conn.close()
 
-    lines = ["🛍 <b>مارکت جوجو</b>\n", "روزانه فقط ۵۰ محصول میتونی بخری.\n"]
+    lines = ["🛍 مارکت جوجو\n", "روزانه فقط ۵۰ محصول میتونی بخری.\n"]
     for item in items:
         lines.append(f"• {item['name']} — {item['description']}")
 
-    await message.answer("\n".join(lines), reply_markup=market_menu_kb(items), parse_mode="HTML")
+    text = "\n".join(lines)
+    text, entities = build_premium_entities(text, [])
+    await message.answer(text, entities=entities or None, reply_markup=market_menu_kb(items))
 
 
 @router.callback_query(F.data.startswith("market_buy_"))

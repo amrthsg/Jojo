@@ -41,6 +41,7 @@ from config import (
     LOAN_INSTALLMENT_INTERVAL_SECONDS,
 )
 from utils.leveling import format_time
+from utils.premium_emoji import build_premium_entities
 
 router = Router()
 
@@ -66,20 +67,20 @@ async def _guard_owner(callback: CallbackQuery) -> bool:
     return True
 
 
-def _format_bank_text(user, account, interest_applied: int) -> str:
+def _format_bank_text(user, account, interest_applied: int):
     preview = preview_next_interest(user["user_id"])
     base_balance, interest, balance_after, remaining_seconds = preview
 
     text = (
-        f"🏦 <b>بانک جوجو</b>\n\n"
-        f"💳 شماره کارت: <code>{account['card_number']}</code>\n"
+        f"🏦 بانک جوجو\n\n"
+        f"💳 شماره کارت: {account['card_number']}\n"
         f"👤 به نام: {user['display_name'] or user['pet_name']}\n\n"
         f"🏆 موجودی حساب: {account['balance']:,} {CURRENCY_EMOJI}\n\n"
-        f"🤑 <b>سود بانکی</b>\n"
+        f"🤑 سود بانکی\n"
         f"🌸 درصد سود: ۳٪ روزانه\n"
         f"⬇️ کل سود دریافتی: {account['total_interest_earned']:,} {CURRENCY_EMOJI}\n"
         f"⏳ واریز بعدی: {format_time(remaining_seconds)}\n\n"
-        f"⚡️ <b>محاسبه سود روزانه</b>\n"
+        f"⚡️ محاسبه سود روزانه\n"
         f"— موجودی مبنا: {base_balance:,}\n"
         f"— سود قابل دریافت: +{interest:,}\n"
         f"— موجودی بعد از سود: {balance_after:,}\n"
@@ -88,7 +89,10 @@ def _format_bank_text(user, account, interest_applied: int) -> str:
     if interest_applied:
         text += f"\n🎉 سود {interest_applied:,} {CURRENCY_EMOJI} همین الان به حسابت اضافه شد!\n"
 
-    return text
+    placeholders = [
+        ("🏆", "trophy"), ("⏳", "clock"), ("🎉", "sparkle"),
+    ]
+    return build_premium_entities(text, placeholders)
 
 
 async def _send_bank_menu(message_or_callback, user_id: int, edit: bool = False):
@@ -114,12 +118,13 @@ async def _send_bank_menu(message_or_callback, user_id: int, edit: bool = False)
             return
         add_meow_points(user_id, -BANK_ACCOUNT_OPEN_COST)
         card_number = open_bank_account(user_id)
-        text = f"🎉 حساب بانکی باز شد!\n💳 شماره حساب شما: <code>{card_number}</code>"
+        text = f"🎉 حساب بانکی باز شد!\n💳 شماره حساب شما: {card_number}"
+        text, entities = build_premium_entities(text, [("🎉", "sparkle"), ("💳", "card")])
         if edit:
-            sent = await message_or_callback.message.edit_text(text, parse_mode="HTML", reply_markup=bank_menu_kb())
+            sent = await message_or_callback.message.edit_text(text, entities=entities or None, reply_markup=bank_menu_kb())
             set_panel_owner(message_or_callback.message.chat.id, message_or_callback.message.message_id, user_id)
         else:
-            sent = await message_or_callback.answer(text, parse_mode="HTML", reply_markup=bank_menu_kb())
+            sent = await message_or_callback.answer(text, entities=entities or None, reply_markup=bank_menu_kb())
             set_panel_owner(sent.chat.id, sent.message_id, user_id)
         return
 
@@ -129,15 +134,13 @@ async def _send_bank_menu(message_or_callback, user_id: int, edit: bool = False)
     interest_applied = calculate_and_apply_interest(user_id)
     account = get_bank_account(user_id)  # رفرش بعد از سود/قسط احتمالی
 
-    text = _format_bank_text(user, account, interest_applied)
-    if paid:
-        text += f"\n💸 {loan_msg}\n"
+    text, entities = _format_bank_text(user, account, interest_applied, loan_msg if paid else None)
 
     if edit:
-        await message_or_callback.message.edit_text(text, parse_mode="HTML", reply_markup=bank_menu_kb())
+        await message_or_callback.message.edit_text(text, entities=entities or None, reply_markup=bank_menu_kb())
         set_panel_owner(message_or_callback.message.chat.id, message_or_callback.message.message_id, user_id)
     else:
-        sent = await message_or_callback.answer(text, parse_mode="HTML", reply_markup=bank_menu_kb())
+        sent = await message_or_callback.answer(text, entities=entities or None, reply_markup=bank_menu_kb())
         set_panel_owner(sent.chat.id, sent.message_id, user_id)
 
 
@@ -352,7 +355,9 @@ async def cb_change_card_number(callback: CallbackQuery):
         return
     success, msg, new_number = change_card_number(callback.from_user.id, CARD_NUMBER_CHANGE_COST)
     if success:
-        await callback.message.answer(f"✅ شماره حساب جدید: <code>{new_number}</code>", parse_mode="HTML")
+        text = f"✅ شماره حساب جدید: {new_number}"
+        text, entities = build_premium_entities(text, [("✅", "checkmark")])
+        await callback.message.answer(text, entities=entities or None)
     else:
         await callback.message.answer(f"❌ {msg}")
     await callback.answer()
@@ -371,12 +376,14 @@ async def cb_bank_transactions(callback: CallbackQuery):
         await callback.answer("هنوز هیچ تراکنش کارت‌به‌کارتی نداری.", show_alert=True)
         return
 
-    lines = ["📜 <b>تراکنش‌های بانکی</b>\n"]
+    lines = ["📜 تراکنش‌های بانکی\n"]
     for tx in txs:
         direction = "⬆️ ارسال" if tx["from_user"] == user_id else "⬇️ دریافت"
         lines.append(f"{direction} — {tx['amount']:,} {CURRENCY_EMOJI} (کارمزد {tx['fee']:,})")
 
-    await callback.message.answer("\n".join(lines), parse_mode="HTML")
+    text = "\n".join(lines)
+    text, entities = build_premium_entities(text, [])
+    await callback.message.answer(text, entities=entities or None)
     await callback.answer()
 
 
@@ -439,24 +446,28 @@ async def cb_loan_request(callback: CallbackQuery, state: FSMContext):
 
     if active_loan:
         remaining_installments = active_loan["installments_total"] - active_loan["installments_paid"]
-        await callback.message.edit_text(
+        text = (
             f"⚠️ شما یک وام فعال دارید.\n\n"
             f"💰 مانده بازپرداخت: {active_loan['remaining_amount']:,} {CURRENCY_EMOJI}\n"
             f"📋 اقساط باقی‌مانده: {remaining_installments} از {active_loan['installments_total']}\n"
-            f"💳 مبلغ هر قسط: {active_loan['installment_amount']:,} {CURRENCY_EMOJI}",
-            reply_markup=bank_menu_kb(),
+            f"💳 مبلغ هر قسط: {active_loan['installment_amount']:,} {CURRENCY_EMOJI}"
         )
+        text, entities = build_premium_entities(text, [("💰", "money_bag")])
+        await callback.message.edit_text(text, entities=entities or None, reply_markup=bank_menu_kb())
         await callback.answer()
         return
 
-    await callback.message.edit_text(
-        f"➕ <b>وام بانک جوجو</b>\n\n"
+    text = (
+        f"➕ وام بانک جوجو\n\n"
         f"مقدار مبلغ وام موردنظر را وارد کنید.\n"
         f"❗️ حداکثر درخواست: {LOAN_MAX_AMOUNT:,} {CURRENCY_EMOJI}\n"
         f"⏳ مدت بازپرداخت: {LOAN_INSTALLMENTS_COUNT} روز، در {LOAN_INSTALLMENTS_COUNT} قسط روزانه\n"
-        f"⬆️ کارمزد بازپرداخت: {LOAN_FEE_PERCENT}٪\n",
+        f"⬆️ کارمزد بازپرداخت: {LOAN_FEE_PERCENT}٪\n"
+    )
+    text, entities = build_premium_entities(text, [])
+    await callback.message.edit_text(
+        text, entities=entities or None,
         reply_markup=cancel_kb(),
-        parse_mode="HTML",
     )
     await state.set_state(BankStates.waiting_loan_amount)
     await callback.answer()

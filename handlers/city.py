@@ -17,6 +17,7 @@ from database.models import (
     get_city_top_donors,
 )
 from keyboards.main_kb import city_menu_kb, city_donate_amount_kb, cancel_kb
+from utils.premium_emoji import build_premium_entities
 from config import CITY_MIN_LEVEL_FOR_BUILDING, CITY_UPGRADE_TREASURY_TARGETS, CURRENCY_EMOJI
 
 router = Router()
@@ -26,9 +27,9 @@ class CityStates(StatesGroup):
     waiting_custom_donation = State()
 
 
-def _city_status_text(city) -> str:
+def _city_status_text(city):
     lines = [
-        "🏙 <b>شهر جوجویی</b>\n",
+        "🏙 شهر جوجویی\n",
         f"📈 سطح شهر: {city['level']}",
         f"💰 خزانه: {city['treasury']:,} {CURRENCY_EMOJI}",
         f"🐤 مجموع جیک شهر: {city['total_jik']:,}",
@@ -38,7 +39,7 @@ def _city_status_text(city) -> str:
     target = CITY_UPGRADE_TREASURY_TARGETS.get(city["level"])
     if target:
         lines.append(
-            f"\n🎯 <b>هدف ارتقا به سطح {city['level'] + 1}:</b>\n"
+            f"\n🎯 هدف ارتقا به سطح {city['level'] + 1}:\n"
             f"💰 خزانه: {city['treasury']:,} / {target['treasury']:,}\n"
             f"🐤 جیک: {city['total_jik']:,} / {target['jik']:,}\n"
             f"👥 جمعیت: {city['population']:,} / {target['population']:,}"
@@ -46,7 +47,8 @@ def _city_status_text(city) -> str:
     else:
         lines.append("\n🏆 شهر به بالاترین سطح تعریف‌شده رسیده!")
 
-    return "\n".join(lines)
+    text = "\n".join(lines)
+    return build_premium_entities(text, [("💰", "money_bag"), ("🏆", "trophy")])
 
 
 @router.message(F.text == "شهر")
@@ -58,20 +60,15 @@ async def handle_city_menu(message: Message):
     create_city_if_not_exists(message.chat.id)
     city = get_city(message.chat.id)
 
-    await message.answer(
-        _city_status_text(city),
-        reply_markup=city_menu_kb(),
-        parse_mode="HTML",
-    )
+    text, entities = _city_status_text(city)
+    await message.answer(text, entities=entities or None, reply_markup=city_menu_kb())
 
 
 @router.callback_query(F.data == "city_donate")
 async def cb_city_donate(callback: CallbackQuery):
-    await callback.message.edit_text(
-        "💰 <b>کمک به خزانه شهر</b>\n\nچقدر می‌خوای کمک کنی؟",
-        reply_markup=city_donate_amount_kb(),
-        parse_mode="HTML",
-    )
+    text = "💰 کمک به خزانه شهر\n\nچقدر می‌خوای کمک کنی؟"
+    text, entities = build_premium_entities(text, [("💰", "money_bag")])
+    await callback.message.edit_text(text, entities=entities or None, reply_markup=city_donate_amount_kb())
     await callback.answer()
 
 
@@ -93,11 +90,8 @@ async def cb_city_donate_amount(callback: CallbackQuery):
 
     city = get_city(callback.message.chat.id)
     await callback.answer(f"✅ {amount:,} {CURRENCY_EMOJI} به خزانه شهر کمک کردی!", show_alert=True)
-    await callback.message.edit_text(
-        _city_status_text(city),
-        reply_markup=city_menu_kb(),
-        parse_mode="HTML",
-    )
+    text, entities = _city_status_text(city)
+    await callback.message.edit_text(text, entities=entities or None, reply_markup=city_menu_kb())
 
 
 @router.callback_query(F.data == "citydonate_custom")
@@ -134,11 +128,14 @@ async def handle_custom_donation_amount(message: Message, state: FSMContext):
     donate_to_city(chat_id, message.from_user.id, amount)
 
     city = get_city(chat_id)
-    await message.answer(
-        f"✅ {amount:,} {CURRENCY_EMOJI} به خزانه شهر کمک کردی!\n\n" + _city_status_text(city),
-        reply_markup=city_menu_kb(),
-        parse_mode="HTML",
-    )
+    city_text, entities = _city_status_text(city)
+    full_text = f"✅ {amount:,} {CURRENCY_EMOJI} به خزانه شهر کمک کردی!\n\n{city_text}"
+    # چون یه پیشوند به متن اضافه شد، آفست‌های entities باید جابه‌جا بشن
+    prefix_len = len(f"✅ {amount:,} {CURRENCY_EMOJI} به خزانه شهر کمک کردی!\n\n".encode("utf-16-le")) // 2
+    for e in entities:
+        e.offset += prefix_len
+
+    await message.answer(full_text, entities=entities or None, reply_markup=city_menu_kb())
 
 
 @router.callback_query(F.data == "city_upgrade")
@@ -166,18 +163,15 @@ async def cb_city_upgrade(callback: CallbackQuery):
 
     city = get_city(callback.message.chat.id)
     await callback.answer(f"🎉 شهر به سطح {new_level} ارتقا یافت!", show_alert=True)
-    await callback.message.edit_text(
-        _city_status_text(city),
-        reply_markup=city_menu_kb(),
-        parse_mode="HTML",
-    )
+    text, entities = _city_status_text(city)
+    await callback.message.edit_text(text, entities=entities or None, reply_markup=city_menu_kb())
 
 
 @router.callback_query(F.data == "city_top_donors")
 async def cb_city_top_donors(callback: CallbackQuery):
     donors = get_city_top_donors(callback.message.chat.id, limit=5)
 
-    lines = ["🏅 <b>برترین کمک‌کننده‌های شهر</b>\n"]
+    lines = ["🏅 برترین کمک‌کننده‌های شهر\n"]
     medals = ["🥇", "🥈", "🥉"]
     if not donors:
         lines.append("هنوز کسی کمکی نکرده.")
@@ -186,20 +180,15 @@ async def cb_city_top_donors(callback: CallbackQuery):
             medal = medals[i] if i < 3 else f"{i + 1}."
             lines.append(f"{medal} کاربر {donor['user_id']} — {donor['total']:,} {CURRENCY_EMOJI}")
 
-    await callback.message.edit_text(
-        "\n".join(lines),
-        reply_markup=city_menu_kb(),
-        parse_mode="HTML",
-    )
+    text = "\n".join(lines)
+    text, entities = build_premium_entities(text, [])
+    await callback.message.edit_text(text, entities=entities or None, reply_markup=city_menu_kb())
     await callback.answer()
 
 
 @router.callback_query(F.data == "city_back")
 async def cb_city_back(callback: CallbackQuery):
     city = get_city(callback.message.chat.id)
-    await callback.message.edit_text(
-        _city_status_text(city),
-        reply_markup=city_menu_kb(),
-        parse_mode="HTML",
-    )
+    text, entities = _city_status_text(city)
+    await callback.message.edit_text(text, entities=entities or None, reply_markup=city_menu_kb())
     await callback.answer()

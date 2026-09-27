@@ -20,6 +20,7 @@ from database.models import (
 )
 from keyboards.main_kb import smuggling_menu_kb, smuggling_chick_count_kb
 from utils.leveling import format_time
+from utils.premium_emoji import build_premium_entities
 from config import (
     SMUGGLING_MIN_LEVEL,
     SMUGGLING_MIN_CHICKS,
@@ -42,24 +43,27 @@ async def _guard_owner(callback: CallbackQuery) -> bool:
     return True
 
 
-def _run_status_text(run) -> str:
+def _run_status_text(run):
     if not run:
-        return (
-            "🚚 <b>قاچاق جوجه</b>\n\n"
+        text = (
+            "🚚 قاچاق جوجه\n\n"
             f"می‌تونی بین {SMUGGLING_MIN_CHICKS} تا {SMUGGLING_MAX_CHICKS} جوجه رو قاچاق کنی.\n"
             "هرچی جوجه بیشتر ببری، جایزه بیشتره، ولی احتمال لو رفتن هم بالاتر میره!"
         )
+        return build_premium_entities(text, [])
 
     now = int(time.time())
     if now >= run["finishes_at"]:
-        return "🚚 ماموریتت تموم شده! نتیجه رو بررسی کن."
+        text = "🚚 ماموریتت تموم شده! نتیجه رو بررسی کن."
+        return build_premium_entities(text, [])
 
     remaining = run["finishes_at"] - now
-    return (
-        "🚚 <b>ماموریت در حال انجام</b>\n\n"
+    text = (
+        "🚚 ماموریت در حال انجام\n\n"
         f"🐤 تعداد جوجه: {run['chick_count']}\n"
         f"⏳ زمان باقی‌مانده: {format_time(remaining)}"
     )
+    return build_premium_entities(text, [("⏳", "clock")])
 
 
 @router.message(F.text == "قاچاق")
@@ -78,11 +82,11 @@ async def handle_smuggling_menu(message: Message):
         return
 
     run = get_active_smuggling_run(message.from_user.id)
+    text, entities = _run_status_text(run)
 
     sent = await message.answer(
-        _run_status_text(run),
+        text, entities=entities or None,
         reply_markup=smuggling_menu_kb(has_active_run=bool(run)),
-        parse_mode="HTML",
     )
     set_panel_owner(sent.chat.id, sent.message_id, message.from_user.id)
 
@@ -100,10 +104,11 @@ async def cb_smuggling_start(callback: CallbackQuery):
         await callback.answer("⚠️ یه ماموریت در حال انجامه.", show_alert=True)
         return
 
+    text = "🚚 چند تا جوجه ببریم؟\n\nهرچی بیشتر، جایزه بیشتر ولی ریسک لو رفتن هم بیشتر!"
+    text, entities = build_premium_entities(text, [])
     await callback.message.edit_text(
-        "🚚 <b>چند تا جوجه ببریم؟</b>\n\nهرچی بیشتر، جایزه بیشتر ولی ریسک لو رفتن هم بیشتر!",
+        text, entities=entities or None,
         reply_markup=smuggling_chick_count_kb(SMUGGLING_MIN_CHICKS, SMUGGLING_MAX_CHICKS),
-        parse_mode="HTML",
     )
     await callback.answer()
 
@@ -126,12 +131,16 @@ async def cb_smuggling_go(callback: CallbackQuery):
     run_id = create_smuggling_run(user_id, chick_count, reward, now, finishes_at)
 
     await callback.answer("🚚 ماموریت شروع شد! منتظر بمون...", show_alert=True)
-    await callback.message.edit_text(
-        f"🚚 <b>ماموریت در حال انجام</b>\n\n"
+
+    text = (
+        f"🚚 ماموریت در حال انجام\n\n"
         f"🐤 تعداد جوجه: {chick_count}\n"
-        f"⏳ زمان باقی‌مانده: {format_time(SMUGGLING_DURATION_SECONDS)}",
+        f"⏳ زمان باقی‌مانده: {format_time(SMUGGLING_DURATION_SECONDS)}"
+    )
+    text, entities = build_premium_entities(text, [("⏳", "clock")])
+    await callback.message.edit_text(
+        text, entities=entities or None,
         reply_markup=smuggling_menu_kb(has_active_run=True),
-        parse_mode="HTML",
     )
 
     asyncio.create_task(
@@ -152,21 +161,25 @@ async def _resolve_smuggling_after_delay(bot, run_id, user_id, chick_count, rewa
     if caught:
         finish_smuggling_run(run_id, "caught")
         text = (
-            f"🚨 <b>لو رفتی!</b>\n\n"
+            f"🚨 لو رفتی!\n\n"
             f"🐤 {chick_count} جوجه رو نگهبانا گرفتن.\n"
             f"❌ هیچ جایزه‌ای نگرفتی."
         )
+        placeholders = [("❌", "cross")]
     else:
         finish_smuggling_run(run_id, "success")
         add_meow_points(user_id, reward)
         text = (
-            f"✅ <b>ماموریت موفق!</b>\n\n"
+            f"✅ ماموریت موفق!\n\n"
             f"🐤 {chick_count} جوجه رو سالم قاچاق کردی.\n"
             f"💰 جایزه: {reward:,} {CURRENCY_EMOJI}"
         )
+        placeholders = [("✅", "checkmark"), ("💰", "money_bag")]
+
+    text, entities = build_premium_entities(text, placeholders)
 
     try:
-        await bot.send_message(user_id, text, parse_mode="HTML")
+        await bot.send_message(user_id, text, entities=entities or None)
     except Exception:
         pass
 
@@ -176,10 +189,10 @@ async def cb_smuggling_status(callback: CallbackQuery):
     if not await _guard_owner(callback):
         return
     run = get_active_smuggling_run(callback.from_user.id)
+    text, entities = _run_status_text(run)
     await callback.message.edit_text(
-        _run_status_text(run),
+        text, entities=entities or None,
         reply_markup=smuggling_menu_kb(has_active_run=bool(run)),
-        parse_mode="HTML",
     )
     await callback.answer()
 
@@ -189,9 +202,9 @@ async def cb_smuggling_back(callback: CallbackQuery):
     if not await _guard_owner(callback):
         return
     run = get_active_smuggling_run(callback.from_user.id)
+    text, entities = _run_status_text(run)
     await callback.message.edit_text(
-        _run_status_text(run),
+        text, entities=entities or None,
         reply_markup=smuggling_menu_kb(has_active_run=bool(run)),
-        parse_mode="HTML",
     )
     await callback.answer()
