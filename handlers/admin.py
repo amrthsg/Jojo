@@ -77,6 +77,47 @@ def _admin_help_text(owner: bool) -> str:
     return text
 
 
+@router.message(Command("checkemoji"))
+async def cmd_check_emoji(message: Message):
+    """
+    دستور مخفی مخصوص مالک: چک میکنه آیدی‌های ایموجی پرمیوم تو utils/premium_emoji.py
+    واقعاً معتبرن یا نه - مستقیم از تلگرام میپرسه.
+    """
+    if not is_owner(message.from_user.id):
+        return
+
+    from utils.premium_emoji import PREMIUM_EMOJI_MAP
+
+    all_ids = list(PREMIUM_EMOJI_MAP.values())
+    await message.answer(f"در حال بررسی {len(all_ids)} آیدی...")
+
+    try:
+        stickers = await message.bot.get_custom_emoji_stickers(custom_emoji_ids=all_ids)
+        found_ids = {s.custom_emoji_id for s in stickers}
+
+        lines = [f"✅ تلگرام اطلاعات {len(stickers)} تا از {len(all_ids)} آیدی رو برگردوند.\n"]
+
+        id_to_key = {v: k for k, v in PREMIUM_EMOJI_MAP.items()}
+        for s in stickers:
+            key = id_to_key.get(s.custom_emoji_id, "?")
+            lines.append(f"✅ {key}: فالبک={s.emoji} پک={s.set_name}")
+
+        missing = [eid for eid in all_ids if eid not in found_ids]
+        if missing:
+            lines.append(f"\n❌ این {len(missing)} آیدی نامعتبر بودن:")
+            for m in missing:
+                key = id_to_key.get(m, "?")
+                lines.append(f"  - {key}: {m}")
+
+        # پیام رو تیکه‌تیکه بفرست چون ممکنه طولانی باشه
+        full_text = "\n".join(lines)
+        for i in range(0, len(full_text), 3500):
+            await message.answer(full_text[i:i + 3500])
+
+    except Exception as e:
+        await message.answer(f"❌ خطا در ارتباط با تلگرام:\n{e}")
+
+
 @router.message(Command("admin"))
 async def cmd_admin_panel(message: Message):
     if not is_admin(message.from_user.id):
