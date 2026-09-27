@@ -48,7 +48,7 @@ def _casino_intro_text():
         f"بین {CASINO_MIN_PLAYERS} تا {CASINO_MAX_PLAYERS} نفر میتونن با هم شرط ببندن.\n"
         f"همه پول رو وسط میذارن، یک نفر تصادفی همه رو میبره!"
     )
-    return build_premium_entities(text, [("🎰", "casino")])
+    return build_premium_entities(text, [])
 
 
 @router.message(F.text == "کازینو")
@@ -89,7 +89,7 @@ async def cb_casino_create(callback: CallbackQuery):
         return
 
     text = "🎰 مبلغ شرط رو انتخاب کن"
-    text, entities = build_premium_entities(text, [("🎰", "casino")])
+    text, entities = build_premium_entities(text, [])
     await callback.message.edit_text(text, entities=entities or None, reply_markup=casino_bet_amount_kb())
     await callback.answer()
 
@@ -148,7 +148,7 @@ async def cb_casino_bet_amount(callback: CallbackQuery):
         f"⏳ {CASINO_JOIN_WINDOW_SECONDS} ثانیه فرصت برای پیوستن بقیه.\n\n"
         f"حداقل {CASINO_MIN_PLAYERS} نفر لازمه تا بازی شروع بشه."
     )
-    text, entities = build_premium_entities(text, [("🎰", "casino"), (CURRENCY_EMOJI, "coin"), ("⏳", "clock")])
+    text, entities = build_premium_entities(text, [("⏳", "clock")])
     await callback.message.edit_text(text, entities=entities or None, reply_markup=casino_join_kb(table_id))
     # این پیام (دعوت به میز) عمداً مالکیت‌دار نمیشه، چون هر کسی تو گروه باید بتونه بپیونده.
 
