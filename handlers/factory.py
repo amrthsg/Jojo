@@ -109,14 +109,14 @@ def _factory_main_text(user, factory):
             f"هنوز کارخونه نساختی. برای شروع، سطح {FACTORY_MIN_LEVEL} لازمه.\n"
             "با ساخت کارخونه میتونی محصول تولید کنی و بفروشی."
         )
-        return build_premium_entities(text, [])
+        return build_premium_entities(text, [("🏭", "factory")])
 
     level_roman = to_roman(factory["level"])
     xp_needed = _xp_needed_for_level(factory["level"])
     storage_used = get_factory_total_storage_used(user["user_id"])
 
     lines = [
-        "🏭 کارخونه میویی",
+        "🏭 کارخونه جوجویی",
         "",
         f"مدیر کارخونه : {user['display_name'] or user['pet_name']} 🐱",
         "",
@@ -150,14 +150,15 @@ def _factory_main_text(user, factory):
 
     text = "\n".join(lines)
     placeholders = [
-        ("⭐", "star"), ("🌟", "star2"), ("⏳", "clock"),
+        ("🏭", "factory"), ("🐱", "worker"), ("🧳", "storage"), ("⭐", "star"),
+        ("🖨", "gear"), ("⏳", "clock"), ("🌟", "star2"), ("⚡️", "xp"),
     ]
     return build_premium_entities(text, placeholders)
 
 
 # ---------------- منوی اصلی ----------------
 
-@router.message(F.text.in_({"کارخونه", "کارخونه میویی", "کار خونه میویی"}))
+@router.message(F.text.in_({"کارخونه", "کارخونه جوجویی", "کار خونه جوجویی"}))
 async def handle_factory_menu(message: Message):
     user = get_user(message.from_user.id)
     if not user:
@@ -325,7 +326,7 @@ async def cb_factory_collect(callback: CallbackQuery):
 def _factory_storage_text(factory):
     items = get_factory_storage_items(factory["user_id"])
     lines = [
-        "🏭 کارخونه میویی",
+        "🏭 کارخونه جوجویی",
         "",
         "محصولات انبار ✨",
     ]
@@ -347,7 +348,7 @@ def _factory_storage_text(factory):
         lines.append(f"هزینه ارتقا انبار : {cost:,} 💰")
 
     text = "\n".join(lines)
-    return build_premium_entities(text, [("✨", "sparkle"), ("⭐", "star"), ("💰", "money_bag")])
+    return build_premium_entities(text, [("🏭", "factory"), ("✨", "sparkle"), ("⭐", "star"), ("💰", "money_bag")])
 
 
 @router.callback_query(F.data == "factory_storage")
@@ -435,7 +436,7 @@ async def cb_factory_upgrade_storage(callback: CallbackQuery):
 
 def _factory_workers_text(factory):
     lines = [
-        "🏭 کارخونه میویی",
+        "🏭 کارخونه جوجویی",
         "",
         "کارگران کارخونه 🐱",
         f"تعداد کارگران کارخونه : {factory['workers_count']} پیشی 🐱",
@@ -455,7 +456,7 @@ def _factory_workers_text(factory):
     lines.append(f"هزینه استخدام هر کارگر : {FACTORY_WORKER_HIRE_COST:,} 💰")
 
     text = "\n".join(lines)
-    return build_premium_entities(text, [("⭐", "star"), ("💰", "money_bag")])
+    return build_premium_entities(text, [("🏭", "factory"), ("🐱", "worker"), ("🪑", "seat"), ("⭐", "star"), ("💰", "money_bag")])
 
 
 @router.callback_query(F.data == "factory_workers")
@@ -574,7 +575,7 @@ async def cb_factory_upgrade_seats(callback: CallbackQuery):
 
 def _factory_devices_text(factory):
     lines = [
-        "🏭 کارخونه میویی",
+        "🏭 کارخونه جوجویی",
         "",
         "دستگاه‌های تولید 🖨",
         f"زمان مورد نیاز برای تولید : {factory['production_speed_seconds']} ثانیه ⏳",

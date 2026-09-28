@@ -67,7 +67,7 @@ async def _guard_owner(callback: CallbackQuery) -> bool:
     return True
 
 
-def _format_bank_text(user, account, interest_applied: int):
+def _format_bank_text(user, account, interest_applied: int, loan_msg: str | None = None):
     preview = preview_next_interest(user["user_id"])
     base_balance, interest, balance_after, remaining_seconds = preview
 
@@ -89,8 +89,11 @@ def _format_bank_text(user, account, interest_applied: int):
     if interest_applied:
         text += f"\n🎉 سود {interest_applied:,} {CURRENCY_EMOJI} همین الان به حسابت اضافه شد!\n"
 
+    if loan_msg:
+        text += f"\n💸 {loan_msg}\n"
+
     placeholders = [
-        ("🏆", "trophy"), ("⏳", "clock"), ("🎉", "sparkle"),
+        ("🏆", "trophy"), ("⏳", "clock"), ("🎉", "sparkle"), ("⚡️", "xp"),
     ]
     return build_premium_entities(text, placeholders)
 
