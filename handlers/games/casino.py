@@ -13,7 +13,7 @@ from aiogram.fsm.state import State, StatesGroup
 from database.models import get_user, add_meow_points, set_panel_owner, is_panel_owner
 from database.db import get_connection
 from keyboards.main_kb import casino_menu_kb, casino_bet_amount_kb, casino_join_kb, cancel_kb
-from utils.premium_emoji import build_premium_entities
+from utils.premium_emoji import build_premium_entities, get_fallback, NUMBER_EMOJI_KEYS
 from config import (
     CASINO_MIN_LEVEL,
     CASINO_TABLE_MIN_LEVEL,
@@ -44,11 +44,12 @@ async def _guard_owner(callback: CallbackQuery) -> bool:
 
 def _casino_intro_text():
     text = (
-        "🎰 کازینو جوجو\n\n"
-        f"بین {CASINO_MIN_PLAYERS} تا {CASINO_MAX_PLAYERS} نفر میتونن با هم شرط ببندن.\n"
-        f"همه پول رو وسط میذارن، یک نفر تصادفی همه رو میبره!"
+        "🎰 کازینو جوجو 🐤\n"
+        "━━━━━━━━━━━━━\n\n"
+        f"👥 بین {CASINO_MIN_PLAYERS} تا {CASINO_MAX_PLAYERS} نفر میتونن با هم شرط ببندن.\n"
+        f"💰 همه پول رو وسط میذارن، یک نفر تصادفی همه رو میبره! 🎉"
     )
-    return build_premium_entities(text, [])
+    return build_premium_entities(text, [("🎰", "casino"), ("💰", "money_bag"), ("🎉", "sparkle")])
 
 
 @router.message(F.text == "کازینو")
@@ -88,8 +89,8 @@ async def cb_casino_create(callback: CallbackQuery):
         await callback.answer(f"❌ برای ساخت میز کازینو باید حداقل سطح {CASINO_TABLE_MIN_LEVEL} باشی.", show_alert=True)
         return
 
-    text = "🎰 مبلغ شرط رو انتخاب کن"
-    text, entities = build_premium_entities(text, [])
+    text = "🎰 مبلغ شرط رو انتخاب کن 💰"
+    text, entities = build_premium_entities(text, [("🎰", "casino"), ("💰", "money_bag")])
     await callback.message.edit_text(text, entities=entities or None, reply_markup=casino_bet_amount_kb())
     await callback.answer()
 
@@ -142,13 +143,15 @@ async def cb_casino_bet_amount(callback: CallbackQuery):
         return
 
     await callback.answer("✅ میز کازینو ساخته شد!", show_alert=True)
+    player_count_emoji = get_fallback(NUMBER_EMOJI_KEYS.get(1, ""))
     text = (
         f"🎰 میز کازینو #{table_id} با شرط {amount:,} {CURRENCY_EMOJI} باز شد!\n"
-        f"👥 بازیکنان: 1 نفر\n"
+        f"👥 بازیکنان: {player_count_emoji} نفر\n"
         f"⏳ {CASINO_JOIN_WINDOW_SECONDS} ثانیه فرصت برای پیوستن بقیه.\n\n"
-        f"حداقل {CASINO_MIN_PLAYERS} نفر لازمه تا بازی شروع بشه."
+        f"🎯 حداقل {CASINO_MIN_PLAYERS} نفر لازمه تا بازی شروع بشه."
     )
-    text, entities = build_premium_entities(text, [("⏳", "clock")])
+    placeholders = [("⏳", "clock"), (player_count_emoji, NUMBER_EMOJI_KEYS.get(1, ""))]
+    text, entities = build_premium_entities(text, placeholders)
     await callback.message.edit_text(text, entities=entities or None, reply_markup=casino_join_kb(table_id))
     # این پیام (دعوت به میز) عمداً مالکیت‌دار نمیشه، چون هر کسی تو گروه باید بتونه بپیونده.
 
