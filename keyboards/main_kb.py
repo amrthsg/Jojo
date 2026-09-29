@@ -25,12 +25,12 @@ def welcome_inline_kb(bot_username: str) -> InlineKeyboardMarkup:
 def bank_menu_kb() -> InlineKeyboardMarkup:
     kb = [
         [InlineKeyboardButton(text="💳 کارت به کارت", callback_data="bank_transfer")],
-        [InlineKeyboardButton(text="⬆️ واریز", callback_data="bank_deposit"),
-         InlineKeyboardButton(text="⬇️ برداشت", callback_data="bank_withdraw")],
-        [InlineKeyboardButton(text="➕ درخواست وام", callback_data="bank_loan_request"),
-         InlineKeyboardButton(text="📜 تراکنش‌ها", callback_data="bank_transactions")],
+        [InlineKeyboardButton(text="📥 واریز", callback_data="bank_deposit"),
+         InlineKeyboardButton(text="📤 برداشت", callback_data="bank_withdraw")],
+        [InlineKeyboardButton(text="💸 درخواست وام", callback_data="bank_loan_request"),
+         InlineKeyboardButton(text="🧾 تراکنش‌ها", callback_data="bank_transactions")],
         [InlineKeyboardButton(text="🔄 تغییر شماره حساب", callback_data="bank_change_number")],
-        [InlineKeyboardButton(text="🔒 قفل بانک", callback_data="bank_lock")],
+        [InlineKeyboardButton(text="🔐 قفل بانک", callback_data="bank_lock")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
@@ -182,11 +182,11 @@ def feed_menu_kb() -> InlineKeyboardMarkup:
 def factory_menu_kb(has_factory: bool, is_producing_ready: bool) -> InlineKeyboardMarkup:
     kb = []
     if not has_factory:
-        kb.append([InlineKeyboardButton(text="🏭 ساخت کارخونه", callback_data="factory_create")])
+        kb.append([InlineKeyboardButton(text="🏗 ساخت کارخونه", callback_data="factory_create")])
         return InlineKeyboardMarkup(inline_keyboard=kb)
 
     if is_producing_ready:
-        kb.append([InlineKeyboardButton(text="📦 برداشت محصول", callback_data="factory_collect")])
+        kb.append([InlineKeyboardButton(text="🎁 برداشت محصول", callback_data="factory_collect")])
     else:
         kb.append([InlineKeyboardButton(text="⚙️ تولید", callback_data="factory_produce")])
 
@@ -201,7 +201,7 @@ def factory_products_kb(products: dict, factory_level: int) -> InlineKeyboardMar
     kb = []
     for key, info in products.items():
         if factory_level >= info["min_factory_level"]:
-            text = f"{info['emoji']} تولیدی {info['name']}"
+            text = f"{info['emoji']} تولیدی {info['name']} ✨"
             callback = f"factory_makeprod_{key}"
         else:
             text = f"🔒 {info['name']} (سطح {info['min_factory_level']})"
@@ -215,7 +215,7 @@ def factory_storage_kb(has_items: bool) -> InlineKeyboardMarkup:
     kb = []
     if has_items:
         kb.append([InlineKeyboardButton(text="💰 فروش کل انبار", callback_data="factory_sell_all")])
-    kb.append([InlineKeyboardButton(text="⭐ ارتقا انبار کارخونه", callback_data="factory_upgrade_storage")])
+    kb.append([InlineKeyboardButton(text="📈 ارتقا انبار کارخونه", callback_data="factory_upgrade_storage")])
     kb.append([InlineKeyboardButton(text="🔙 بازگشت", callback_data="factory_back")])
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
@@ -224,19 +224,19 @@ def factory_workers_kb(can_hire: bool, can_fire: bool) -> InlineKeyboardMarkup:
     kb = []
     row = []
     if can_hire:
-        row.append(InlineKeyboardButton(text="📝 استخدام کارگر", callback_data="factory_hire"))
+        row.append(InlineKeyboardButton(text="✅ استخدام کارگر", callback_data="factory_hire"))
     if can_fire:
-        row.append(InlineKeyboardButton(text="🚫 اخراج کارگر", callback_data="factory_fire"))
+        row.append(InlineKeyboardButton(text="❌ اخراج کارگر", callback_data="factory_fire"))
     if row:
         kb.append(row)
-    kb.append([InlineKeyboardButton(text="⭐ ارتقا صندلی کارگران", callback_data="factory_upgrade_seats")])
+    kb.append([InlineKeyboardButton(text="🪑 ارتقا صندلی کارگران", callback_data="factory_upgrade_seats")])
     kb.append([InlineKeyboardButton(text="🔙 بازگشت", callback_data="factory_back")])
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
 def factory_devices_kb() -> InlineKeyboardMarkup:
     kb = [
-        [InlineKeyboardButton(text="⭐ ارتقا دستگاه‌های تولید", callback_data="factory_upgrade_device")],
+        [InlineKeyboardButton(text="⚡️ ارتقا دستگاه‌های تولید", callback_data="factory_upgrade_device")],
         [InlineKeyboardButton(text="🔙 بازگشت", callback_data="factory_back")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=kb)
@@ -255,7 +255,7 @@ def city_menu_kb() -> InlineKeyboardMarkup:
 
 def city_donate_amount_kb() -> InlineKeyboardMarkup:
     amounts = [1000, 5000, 20000, 50000]
-    kb = [[InlineKeyboardButton(text=f"{a:,}", callback_data=f"citydonate_{a}")] for a in amounts]
+    kb = [[InlineKeyboardButton(text=f"🪙 {a:,}", callback_data=f"citydonate_{a}")] for a in amounts]
     kb.append([InlineKeyboardButton(text="✏️ مبلغ دلخواه", callback_data="citydonate_custom")])
     kb.append([InlineKeyboardButton(text="🔙 بازگشت", callback_data="city_back")])
     return InlineKeyboardMarkup(inline_keyboard=kb)
