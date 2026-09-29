@@ -42,7 +42,7 @@ async def handle_market(message: Message):
     items = conn.execute("SELECT * FROM market_items").fetchall()
     conn.close()
 
-    lines = ["🛍 مارکت جوجو\n", "روزانه فقط ۵۰ محصول میتونی بخری.\n"]
+    lines = ["🛍 مارکت جوجو 🐤", "━━━━━━━━━━━━━\n", "📦 روزانه فقط ۵۰ محصول میتونی بخری.\n"]
     for item in items:
         lines.append(f"• {item['name']} — {item['description']}")
 

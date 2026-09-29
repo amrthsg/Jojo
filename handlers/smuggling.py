@@ -46,21 +46,23 @@ async def _guard_owner(callback: CallbackQuery) -> bool:
 def _run_status_text(run):
     if not run:
         text = (
-            "🚚 قاچاق جوجه\n\n"
-            f"می‌تونی بین {SMUGGLING_MIN_CHICKS} تا {SMUGGLING_MAX_CHICKS} جوجه رو قاچاق کنی.\n"
-            "هرچی جوجه بیشتر ببری، جایزه بیشتره، ولی احتمال لو رفتن هم بالاتر میره!"
+            "🚚 قاچاق جوجه 🐤\n"
+            "━━━━━━━━━━━━━\n\n"
+            f"📦 می‌تونی بین {SMUGGLING_MIN_CHICKS} تا {SMUGGLING_MAX_CHICKS} جوجه رو قاچاق کنی.\n"
+            "🔥 هرچی جوجه بیشتر ببری، جایزه بیشتره، ولی احتمال لو رفتن هم بالاتر میره!"
         )
-        return build_premium_entities(text, [])
+        return build_premium_entities(text, [("🔥", "fire")])
 
     now = int(time.time())
     if now >= run["finishes_at"]:
-        text = "🚚 ماموریتت تموم شده! نتیجه رو بررسی کن."
-        return build_premium_entities(text, [])
+        text = "✅ ماموریتت تموم شده! نتیجه رو بررسی کن. 🔍"
+        return build_premium_entities(text, [("✅", "checkmark")])
 
     remaining = run["finishes_at"] - now
     text = (
-        "🚚 ماموریت در حال انجام\n\n"
-        f"🐤 تعداد جوجه: {run['chick_count']}\n"
+        "🚚 ماموریت در حال انجام 🔄\n"
+        "━━━━━━━━━━━━━\n\n"
+        f"🐣 تعداد جوجه: {run['chick_count']}\n"
         f"⏳ زمان باقی‌مانده: {format_time(remaining)}"
     )
     return build_premium_entities(text, [("⏳", "clock")])
@@ -161,8 +163,9 @@ async def _resolve_smuggling_after_delay(bot, run_id, user_id, chick_count, rewa
     if caught:
         finish_smuggling_run(run_id, "caught")
         text = (
-            f"🚨 لو رفتی!\n\n"
-            f"🐤 {chick_count} جوجه رو نگهبانا گرفتن.\n"
+            f"🚨 لو رفتی! 👮\n"
+            f"━━━━━━━━━━━━━\n\n"
+            f"🐣 {chick_count} جوجه رو نگهبانا گرفتن.\n"
             f"❌ هیچ جایزه‌ای نگرفتی."
         )
         placeholders = [("❌", "cross")]
@@ -170,11 +173,12 @@ async def _resolve_smuggling_after_delay(bot, run_id, user_id, chick_count, rewa
         finish_smuggling_run(run_id, "success")
         add_meow_points(user_id, reward)
         text = (
-            f"✅ ماموریت موفق!\n\n"
-            f"🐤 {chick_count} جوجه رو سالم قاچاق کردی.\n"
+            f"✅ ماموریت موفق! 🎉\n"
+            f"━━━━━━━━━━━━━\n\n"
+            f"🐣 {chick_count} جوجه رو سالم قاچاق کردی.\n"
             f"💰 جایزه: {reward:,} {CURRENCY_EMOJI}"
         )
-        placeholders = [("✅", "checkmark"), ("💰", "money_bag")]
+        placeholders = [("✅", "checkmark"), ("💰", "money_bag"), ("🎉", "sparkle")]
 
     text, entities = build_premium_entities(text, placeholders)
 

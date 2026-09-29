@@ -29,26 +29,27 @@ class CityStates(StatesGroup):
 
 def _city_status_text(city):
     lines = [
-        "🏙 شهر جوجویی\n",
-        f"📈 سطح شهر: {city['level']}",
+        "🏙 شهر جوجویی 🐤",
+        "━━━━━━━━━━━━━\n",
+        f"🌟 سطح شهر: {city['level']}",
         f"💰 خزانه: {city['treasury']:,} {CURRENCY_EMOJI}",
-        f"🐤 مجموع جیک شهر: {city['total_jik']:,}",
+        f"🐣 مجموع جیک شهر: {city['total_jik']:,}",
         f"👥 جمعیت: {city['population']:,}",
     ]
 
     target = CITY_UPGRADE_TREASURY_TARGETS.get(city["level"])
     if target:
         lines.append(
-            f"\n🎯 هدف ارتقا به سطح {city['level'] + 1}:\n"
+            f"\n🎯 هدف ارتقا به سطح {city['level'] + 1}: 📈\n"
             f"💰 خزانه: {city['treasury']:,} / {target['treasury']:,}\n"
-            f"🐤 جیک: {city['total_jik']:,} / {target['jik']:,}\n"
+            f"🐣 جیک: {city['total_jik']:,} / {target['jik']:,}\n"
             f"👥 جمعیت: {city['population']:,} / {target['population']:,}"
         )
     else:
-        lines.append("\n🏆 شهر به بالاترین سطح تعریف‌شده رسیده!")
+        lines.append("\n🏆 شهر به بالاترین سطح تعریف‌شده رسیده! 🎉")
 
     text = "\n".join(lines)
-    return build_premium_entities(text, [("💰", "money_bag"), ("🏆", "trophy")])
+    return build_premium_entities(text, [("💰", "money_bag"), ("🏆", "trophy"), ("🌟", "star2"), ("🎉", "sparkle")])
 
 
 @router.message(F.text == "شهر")

@@ -15,21 +15,21 @@ MEDALS = ["🥇", "🥈", "🥉"]
 
 
 def _format_leaderboard(rows, title: str):
-    lines = [f"🏆 {title}\n"]
+    lines = [f"🏆 {title}", "━━━━━━━━━━━━━\n"]
     for i, row in enumerate(rows):
-        medal = MEDALS[i] if i < 3 else f"{i + 1}."
+        medal = MEDALS[i] if i < 3 else f"🔹 {i + 1}."
         # اسم واقعی تلگرام رو ترجیح می‌دیم، وگرنه نام جوجو یا یوزرنیم
         name = row["display_name"] or row["pet_name"] or row["username"] or "ناشناس"
         lines.append(f"{medal} {name} — {row['score']:,} {CURRENCY_EMOJI}")
     if not rows:
-        lines.append("هنوز کسی امتیازی نداره!")
+        lines.append("😶 هنوز کسی امتیازی نداره!")
     text = "\n".join(lines)
     return build_premium_entities(text, [("🏆", "trophy")])
 
 
 @router.message(F.text == "لیدربرد")
 async def handle_leaderboard_menu(message: Message):
-    text = "🏆 لیدربرد جوجو\n\nیکی از لیدربردها رو انتخاب کن:"
+    text = "🏆 لیدربرد جوجو 🐤\n━━━━━━━━━━━━━\n\n🎯 یکی از لیدربردها رو انتخاب کن:"
     text, entities = build_premium_entities(text, [("🏆", "trophy")])
     await message.answer(text, entities=entities or None, reply_markup=leaderboard_menu_kb())
 

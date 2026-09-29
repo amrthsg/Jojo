@@ -105,9 +105,10 @@ async def _guard_owner(callback: CallbackQuery) -> bool:
 def _factory_main_text(user, factory):
     if not factory:
         text = (
-            "🏭 کارخونه جوجویی\n\n"
-            f"هنوز کارخونه نساختی. برای شروع، سطح {FACTORY_MIN_LEVEL} لازمه.\n"
-            "با ساخت کارخونه میتونی محصول تولید کنی و بفروشی."
+            "🏭 کارخونه جوجویی 🐤\n"
+            "━━━━━━━━━━━━━\n\n"
+            f"🔒 هنوز کارخونه نساختی. برای شروع، سطح {FACTORY_MIN_LEVEL} لازمه.\n"
+            "🏗 با ساخت کارخونه میتونی محصول تولید کنی و بفروشی."
         )
         return build_premium_entities(text, [("🏭", "factory")])
 
@@ -116,42 +117,44 @@ def _factory_main_text(user, factory):
     storage_used = get_factory_total_storage_used(user["user_id"])
 
     lines = [
-        "🏭 کارخونه جوجویی",
+        "🏭 کارخونه جوجویی 🐤",
+        "━━━━━━━━━━━━━",
         "",
-        f"مدیر کارخونه : {user['display_name'] or user['pet_name']} 🐱",
+        f"👤 مدیر کارخونه : {user['display_name'] or user['pet_name']} 🐱",
         "",
-        "انبار کارخونه 🧳",
-        f"ظرفیت انبار : {storage_used:,} / {factory['storage_capacity']:,} محصول ⭐",
-        f"سطح : {factory['storage_level']} ⭐",
+        "📦 انبار کارخونه 🧳",
+        f"🔸 ظرفیت انبار : {storage_used:,} / {factory['storage_capacity']:,} محصول ✨",
+        f"🔹 سطح انبار : {factory['storage_level']} ⭐",
         "",
-        "کارگران کارخونه 🐱",
-        f"تعداد کارگران : {factory['workers_count']} / {factory['seats_count']} پیشی 🐱",
-        f"سطح : {factory['seats_level']} ⭐",
+        "🐱 کارگران کارخونه 👷",
+        f"🔸 تعداد کارگران : {factory['workers_count']} / {factory['seats_count']} پیشی 🪑",
+        f"🔹 سطح صندلی : {factory['seats_level']} ⭐",
         "",
-        "دستگاه‌های تولید 🖨",
-        f"زمان تولید محصول : {factory['production_speed_seconds']} ثانیه ⏳",
-        f"سطح : {factory['device_level']} ⭐",
+        "🖨 دستگاه‌های تولید ⚙️",
+        f"🔸 زمان تولید محصول : {factory['production_speed_seconds']} ثانیه ⏳",
+        f"🔹 سطح دستگاه : {factory['device_level']} ⭐",
         "",
-        f"سطح کارخونه : {level_roman} 🌟",
-        f"{factory['xp']:,}XP / {xp_needed:,}XP ⚡️",
+        f"🌟 سطح کارخونه : {level_roman}",
+        f"⚡️ تجربه : {factory['xp']:,}XP / {xp_needed:,}XP",
     ]
 
     if factory["current_product"]:
         product = FACTORY_PRODUCTS.get(factory["current_product"])
         if _is_production_ready(factory):
-            lines.append(f"\n✅ تولید «{product['name']}» آماده‌ست! برداشت کن.")
+            lines.append(f"\n✅ تولید «{product['name']}» آماده‌ست! 🎁 برداشت کن.")
         else:
             elapsed = int(time.time()) - factory["production_start_time"]
             remaining = factory["production_speed_seconds"] - elapsed
-            lines.append(f"\n⚙️ در حال تولید «{product['name']}»...")
+            lines.append(f"\n⚙️ در حال تولید «{product['name']}»... 🔄")
             lines.append(f"⏳ زمان باقی‌مانده: {format_time(remaining)}")
     else:
-        lines.append("\nشما درحال مدیریت کارخانه خود میباشید. 📋")
+        lines.append("\n📋 شما درحال مدیریت کارخانه خود میباشید. 🏭")
 
     text = "\n".join(lines)
     placeholders = [
         ("🏭", "factory"), ("🐱", "worker"), ("🧳", "storage"), ("⭐", "star"),
         ("🖨", "gear"), ("⏳", "clock"), ("🌟", "star2"), ("⚡️", "xp"),
+        ("🪑", "seat"), ("✨", "sparkle"), ("🎁", "gift"),
     ]
     return build_premium_entities(text, placeholders)
 
@@ -327,8 +330,9 @@ def _factory_storage_text(factory):
     items = get_factory_storage_items(factory["user_id"])
     lines = [
         "🏭 کارخونه جوجویی",
+        "━━━━━━━━━━━━━",
         "",
-        "محصولات انبار ✨",
+        "📦 محصولات انبار ✨",
     ]
     if not items:
         lines.append("❗️ هیچ محصولی در انبار موجود نیست.")
@@ -336,16 +340,16 @@ def _factory_storage_text(factory):
         for item in items:
             product = FACTORY_PRODUCTS.get(item["product_key"])
             name = product["name"] if product else item["product_key"]
-            emoji = product["emoji"] if product else ""
-            lines.append(f"{emoji} {name}: {item['amount']:,}")
+            emoji = product["emoji"] if product else "📦"
+            lines.append(f"🔸 {emoji} {name}: {item['amount']:,}")
 
     if factory["storage_level"] < 30:
         next_capacity = factory["storage_capacity"] + FACTORY_STORAGE_GROWTH_PER_LEVEL
         cost = _storage_upgrade_cost(factory["storage_level"])
         lines.append("")
-        lines.append("سطح بعدی انبار کارخونه ⭐")
-        lines.append(f"ظرفیت جدید : {next_capacity:,} محصول ✨")
-        lines.append(f"هزینه ارتقا انبار : {cost:,} 💰")
+        lines.append("📈 سطح بعدی انبار کارخونه ⭐")
+        lines.append(f"🔹 ظرفیت جدید : {next_capacity:,} محصول ✨")
+        lines.append(f"💰 هزینه ارتقا انبار : {cost:,}")
 
     text = "\n".join(lines)
     return build_premium_entities(text, [("🏭", "factory"), ("✨", "sparkle"), ("⭐", "star"), ("💰", "money_bag")])
@@ -437,23 +441,24 @@ async def cb_factory_upgrade_storage(callback: CallbackQuery):
 def _factory_workers_text(factory):
     lines = [
         "🏭 کارخونه جوجویی",
+        "━━━━━━━━━━━━━",
         "",
-        "کارگران کارخونه 🐱",
-        f"تعداد کارگران کارخونه : {factory['workers_count']} پیشی 🐱",
-        f"تعداد صندلی‌های کارخونه : {factory['seats_count']} صندلی 🪑",
-        f"سطح : {factory['seats_level']} ⭐",
+        "🐱 کارگران کارخونه 👷",
+        f"🔸 تعداد کارگران کارخونه : {factory['workers_count']} پیشی 🐱",
+        f"🔹 تعداد صندلی‌های کارخونه : {factory['seats_count']} صندلی 🪑",
+        f"⭐ سطح صندلی : {factory['seats_level']}",
     ]
 
     if factory["seats_level"] < 30:
         next_seats = factory["seats_count"] + FACTORY_SEATS_GROWTH_PER_LEVEL
         cost = _seats_upgrade_cost(factory["seats_level"])
         lines.append("")
-        lines.append("سطح بعدی صندلی کارکنان کارخونه ⭐")
-        lines.append(f"تعداد صندلی‌های جدید : {next_seats} صندلی 🪑")
-        lines.append(f"هزینه ارتقا صندلی کارکنان : {cost:,} 💰")
+        lines.append("📈 سطح بعدی صندلی کارکنان کارخونه ⭐")
+        lines.append(f"🔸 تعداد صندلی‌های جدید : {next_seats} صندلی 🪑")
+        lines.append(f"💰 هزینه ارتقا صندلی کارکنان : {cost:,}")
 
     lines.append("")
-    lines.append(f"هزینه استخدام هر کارگر : {FACTORY_WORKER_HIRE_COST:,} 💰")
+    lines.append(f"✅ هزینه استخدام هر کارگر : {FACTORY_WORKER_HIRE_COST:,} 💰")
 
     text = "\n".join(lines)
     return build_premium_entities(text, [("🏭", "factory"), ("🐱", "worker"), ("🪑", "seat"), ("⭐", "star"), ("💰", "money_bag")])
@@ -576,25 +581,26 @@ async def cb_factory_upgrade_seats(callback: CallbackQuery):
 def _factory_devices_text(factory):
     lines = [
         "🏭 کارخونه جوجویی",
+        "━━━━━━━━━━━━━",
         "",
-        "دستگاه‌های تولید 🖨",
-        f"زمان مورد نیاز برای تولید : {factory['production_speed_seconds']} ثانیه ⏳",
-        f"سطح : {factory['device_level']} ⭐",
+        "🖨 دستگاه‌های تولید ⚙️",
+        f"⏳ زمان مورد نیاز برای تولید : {factory['production_speed_seconds']} ثانیه",
+        f"⭐ سطح دستگاه : {factory['device_level']}",
     ]
 
     if factory["device_level"] < 30 and factory["production_speed_seconds"] > FACTORY_DEVICE_MIN_SPEED_SECONDS:
         next_speed = _next_device_speed(factory["production_speed_seconds"])
         cost = _device_upgrade_cost(factory["device_level"])
         lines.append("")
-        lines.append("سطح بعدی دستگاه‌های تولید کارخونه ✨")
-        lines.append(f"زمان مورد نیاز برای تولید : {next_speed} ثانیه ⏳")
+        lines.append("📈 سطح بعدی دستگاه‌های تولید کارخونه ✨")
+        lines.append(f"⏳ زمان مورد نیاز برای تولید : {next_speed} ثانیه")
         lines.append("")
-        lines.append(f"هزینه ارتقا دستگاه‌های تولید : {cost:,} 💰")
+        lines.append(f"💰 هزینه ارتقا دستگاه‌های تولید : {cost:,}")
     else:
         lines.append("\n🏆 دستگاه‌ها به بالاترین سرعت ممکن رسیدن.")
 
     text = "\n".join(lines)
-    return build_premium_entities(text, [("⭐", "star"), ("⏳", "clock"), ("✨", "sparkle"), ("💰", "money_bag")])
+    return build_premium_entities(text, [("🏭", "factory"), ("⭐", "star"), ("⏳", "clock"), ("✨", "sparkle"), ("💰", "money_bag"), ("🏆", "trophy")])
 
 
 @router.callback_query(F.data == "factory_devices")

@@ -72,28 +72,30 @@ def _format_bank_text(user, account, interest_applied: int, loan_msg: str | None
     base_balance, interest, balance_after, remaining_seconds = preview
 
     text = (
-        f"🏦 بانک جوجو\n\n"
+        f"🏦 بانک جوجو 🐤\n"
+        f"━━━━━━━━━━━━━\n\n"
         f"💳 شماره کارت: {account['card_number']}\n"
         f"👤 به نام: {user['display_name'] or user['pet_name']}\n\n"
         f"🏆 موجودی حساب: {account['balance']:,} {CURRENCY_EMOJI}\n\n"
-        f"🤑 سود بانکی\n"
+        f"🤑 سود بانکی 📈\n"
         f"🌸 درصد سود: ۳٪ روزانه\n"
-        f"⬇️ کل سود دریافتی: {account['total_interest_earned']:,} {CURRENCY_EMOJI}\n"
+        f"💎 کل سود دریافتی: {account['total_interest_earned']:,} {CURRENCY_EMOJI}\n"
         f"⏳ واریز بعدی: {format_time(remaining_seconds)}\n\n"
-        f"⚡️ محاسبه سود روزانه\n"
-        f"— موجودی مبنا: {base_balance:,}\n"
-        f"— سود قابل دریافت: +{interest:,}\n"
-        f"— موجودی بعد از سود: {balance_after:,}\n"
+        f"⚡️ محاسبه سود روزانه 🧮\n"
+        f"🔹 موجودی مبنا: {base_balance:,}\n"
+        f"🔸 سود قابل دریافت: +{interest:,} ✨\n"
+        f"🔹 موجودی بعد از سود: {balance_after:,}\n"
     )
 
     if interest_applied:
-        text += f"\n🎉 سود {interest_applied:,} {CURRENCY_EMOJI} همین الان به حسابت اضافه شد!\n"
+        text += f"\n🎉 سود {interest_applied:,} {CURRENCY_EMOJI} همین الان به حسابت اضافه شد! 🥳\n"
 
     if loan_msg:
         text += f"\n💸 {loan_msg}\n"
 
     placeholders = [
         ("🏆", "trophy"), ("⏳", "clock"), ("🎉", "sparkle"), ("⚡️", "xp"),
+        ("💎", "diamond"), ("✨", "sparkle"), ("💰", "money_bag"),
     ]
     return build_premium_entities(text, placeholders)
 

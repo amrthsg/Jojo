@@ -114,14 +114,14 @@ async def process_meow(message: Message):
         set_level(user_id, new_level, new_capacity, new_rank)
 
         level_up_text_plain = (
-            f"\n\n🎉 {user['pet_name']} به سطح {new_level} رسید!\n"
+            f"\n\n🎉 {user['pet_name']} به سطح {new_level} رسید! 🌟\n"
             f"🎁 جایزه ارتقا: {bonus:,} {CURRENCY_EMOJI}"
         )
 
     new_cooldown = get_cooldown_seconds(new_level)
 
     text = (
-        f"{user['pet_name']} {reward:,} {CURRENCY_NAME} گرفتی 🐤\n"
+        f"🐣 {user['pet_name']} {reward:,} {CURRENCY_NAME} گرفتی! 🐤\n"
         f"💰 {CURRENCY_NAME} هات : {new_balance:,} {CURRENCY_EMOJI}\n"
         f"⏳ بعد از {format_time(new_cooldown)} میتونی دوباره جیک جیک کنی"
         f"{level_up_text_plain}"
@@ -131,7 +131,7 @@ async def process_meow(message: Message):
     # این پیام بدون تگ HTML و فقط با entities فرستاده میشه.
     text, emoji_entities = build_premium_entities(
         text,
-        [("💰", "money_bag"), ("⏳", "clock")],
+        [("💰", "money_bag"), ("⏳", "clock"), ("🎉", "sparkle"), ("🌟", "star2"), ("🎁", "gift")],
     )
 
     await message.answer(text, entities=emoji_entities or None)
@@ -166,20 +166,21 @@ async def handle_level_info(message: Message):
         return
 
     if user["level"] >= MAX_LEVEL:
-        exp_text = "به حداکثر سطح رسیدی! 🏆"
+        exp_text = "🏆 به حداکثر سطح رسیدی!"
     else:
         needed = get_exp_required_for_level(user["level"] + 1)
         remaining = max(0, needed - user["exp"])
-        exp_text = f"تا سطح بعدی: {remaining} جیک مونده"
+        exp_text = f"🎯 تا سطح بعدی: {remaining} جیک مونده"
 
     text = (
-        f"⭐ سطح و تجربه {user['pet_name']}\n\n"
+        f"⭐ سطح و تجربه {user['pet_name']} 🐤\n"
+        f"━━━━━━━━━━━━━\n\n"
         f"🌟 سطح فعلی: {user['level']} / {MAX_LEVEL}\n"
-        f"🐤 مجموع جیک: {user['exp']:,}\n"
+        f"🐣 مجموع جیک: {user['exp']:,}\n"
         f"👑 مقام: {user['rank_level']}\n\n"
         f"{exp_text}"
     )
-    text, entities = build_premium_entities(text, [("⭐", "star"), ("🌟", "star2")])
+    text, entities = build_premium_entities(text, [("⭐", "star"), ("🌟", "star2"), ("🏆", "trophy")])
     await message.answer(text, entities=entities or None)
 
 
@@ -193,7 +194,8 @@ async def handle_points_info(message: Message):
         return
 
     text = (
-        f"💰 {CURRENCY_NAME} های {user['pet_name']}\n\n"
+        f"💰 {CURRENCY_NAME} های {user['pet_name']} 🐤\n"
+        f"━━━━━━━━━━━━━\n\n"
         f"🪙 موجودی: {user['meow_points']:,} {CURRENCY_EMOJI}\n"
     )
     text, entities = build_premium_entities(text, [("💰", "money_bag")])
@@ -227,14 +229,15 @@ async def handle_profile(message: Message):
     text = (
         f"👤 {full_name}\n"
         f"{username_line}"
-        f"🆔 آیدی عددی: {target_id}\n\n"
+        f"🆔 آیدی عددی: {target_id}\n"
+        f"━━━━━━━━━━━━━\n\n"
         f"🐤 پروفایل {user['pet_name']}\n\n"
         f"🏷 نام جوجو: {user['pet_name']}\n"
         f"👑 مقام: {user['rank_level']}\n"
         f"⭐ سطح: {user['level']} / {MAX_LEVEL}\n\n"
-        f"🪙 موجودی: {user['meow_points']:,} {CURRENCY_EMOJI}\n"
+        f"💰 موجودی: {user['meow_points']:,} {CURRENCY_EMOJI}\n"
     )
-    text, entities = build_premium_entities(text, [("⭐", "star")])
+    text, entities = build_premium_entities(text, [("⭐", "star"), ("💰", "money_bag")])
 
     # تلاش برای گرفتن عکس پروفایل واقعی تلگرام کاربر و فرستادن به همراه متن
     try:
@@ -264,16 +267,18 @@ async def handle_profile(message: Message):
 def _food_menu_text(user):
     if is_pet_hungry(user["user_id"], HUNGER_INTERVAL_SECONDS):
         text = (
-            f"🍽 غذای {user['pet_name']}\n\n"
-            f"{user['pet_name']} گرسنه‌ست!\n"
-            f"هزینه سیر کردن: {FEED_COST:,} {CURRENCY_EMOJI}"
+            f"🍽 غذای {user['pet_name']} 🐤\n"
+            f"━━━━━━━━━━━━━\n\n"
+            f"😖 {user['pet_name']} گرسنه‌ست!\n"
+            f"💰 هزینه سیر کردن: {FEED_COST:,} {CURRENCY_EMOJI}"
         )
     else:
         text = (
-            f"🍽 غذای {user['pet_name']}\n\n"
+            f"🍽 غذای {user['pet_name']} 🐤\n"
+            f"━━━━━━━━━━━━━\n\n"
             f"😋 {user['pet_name']} الان سیره، نیازی به غذا نداره."
         )
-    return build_premium_entities(text, [("🍽", "food")])
+    return build_premium_entities(text, [("🍽", "food"), ("💰", "money_bag")])
 
 
 @router.message(F.text == "غذا")
