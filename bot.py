@@ -26,6 +26,7 @@ from handlers.games.casino import router as casino_router
 from handlers.factory import router as factory_router
 from handlers.city import router as city_router
 from handlers.smuggling import router as smuggling_router
+from handlers.jojoyi import router as jojoyi_router
 from handlers.chance_spawn import router as chance_spawn_router
 
 logging.basicConfig(level=logging.INFO)
@@ -82,6 +83,7 @@ async def main():
     dp.include_router(factory_router)
     dp.include_router(city_router)
     dp.include_router(smuggling_router)
+    dp.include_router(jojoyi_router)
     dp.include_router(meow_router)    # هندلرهای متنی عمومی (شامل «غذا» هم میشه)
     # chance_spawn_router باید آخرین باشه: فیلترش (F.text تو گروه) خیلی
     # عمومیه و باید فقط وقتی هیچکدوم از دستورات بالا match نکردن اجرا بشه.

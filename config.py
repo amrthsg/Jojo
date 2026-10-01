@@ -164,3 +164,22 @@ SMUGGLING_CATCH_CHANCE_PER_CHICK = 0.03  # هر جوجه اضافه، ریسک �
 SMUGGLING_REWARD_MIN_PER_CHICK = 12_500
 SMUGGLING_REWARD_MAX_PER_CHICK = 24_000
 
+# ------- پروفایل «جوجویی» (شکم، تولید خودکار پوینت، مقام ویژه) -------
+JOJOYI_BASE_BELLY_MAX = 8                 # ظرفیت پایه‌ی شکم
+JOJOYI_BELLY_DROP_INTERVAL_SECONDS = 900  # هر ۱۵ دقیقه یک واحد از شکم کم میشه
+JOJOYI_FEED_COST = 5_000                  # هزینه‌ی «گرفتن کرم»
+JOJOYI_FEED_BELLY_RESTORE = 8             # گرفتن کرم چقدر شکم رو پر میکنه
+
+JOJOYI_BASE_PRODUCTION_RATE = 1.0         # پوینت تولیدی در ثانیه (سطح پایه)
+JOJOYI_BASE_PRODUCTION_CAPACITY = 5_000   # سقف پوینت جمع‌شده قبل از نیاز به برداشت
+
+# مقام‌های ویژه‌ی جوجویی: (اسم نمایشی, هزینه ارتقا, سقف شکم جدید, سرعت تولید جدید, ظرفیت جدید)
+JOJOYI_RANKS = {
+    1: {"name": "پنجه برنز", "upgrade_cost": 0, "belly_max": 8, "production_rate": 1.0, "capacity": 5_000},
+    2: {"name": "پنجه نقره", "upgrade_cost": 150_000, "belly_max": 10, "production_rate": 2.0, "capacity": 15_000},
+    3: {"name": "پنجه طلا", "upgrade_cost": 250_000, "belly_max": 15, "production_rate": 4.5, "capacity": 145_250},
+    4: {"name": "پنجه الماس", "upgrade_cost": 500_000, "belly_max": 20, "production_rate": 8.0, "capacity": 400_000},
+    5: {"name": "پنجه افسانه‌ای", "upgrade_cost": 1_200_000, "belly_max": 30, "production_rate": 15.0, "capacity": 1_000_000},
+}
+JOJOYI_MAX_RANK = max(JOJOYI_RANKS.keys())
+
