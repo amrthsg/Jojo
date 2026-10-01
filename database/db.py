@@ -288,6 +288,23 @@ def init_db():
         )
     """)
 
+    # پروفایل «جوجویی» - آمار پیشرفته‌ی جوجوی هر کاربر (شکم، مقام ویژه، تولید خودکار پوینت)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS jojoyi_stats (
+            user_id INTEGER PRIMARY KEY,
+            belly INTEGER DEFAULT 8,             -- شکم/سیری فعلی (0 تا belly_max)
+            belly_max INTEGER DEFAULT 8,         -- سقف شکم
+            jojoyi_rank INTEGER DEFAULT 1,        -- مقام ویژه‌ی جوجویی (طلا/نقره و غیره)
+            produced_total INTEGER DEFAULT 0,     -- کل پوینت تولیدشده تا الان (تاریخی)
+            pending_points INTEGER DEFAULT 0,     -- پوینت جمع‌شده‌ی برداشت‌نشده
+            production_rate REAL DEFAULT 1.0,     -- پوینت تولیدی در ثانیه
+            production_capacity INTEGER DEFAULT 5000,  -- سقف pending_points قبل از نیاز به برداشت
+            last_production_time INTEGER DEFAULT 0,    -- آخرین باری که تولید محاسبه شد
+            last_belly_drop_time INTEGER DEFAULT 0,     -- آخرین باری که شکم کم شد
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
+        )
+    """)
+
     conn.commit()
 
     # ---------------- Migration خودکار ----------------

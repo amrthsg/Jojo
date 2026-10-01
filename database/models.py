@@ -582,3 +582,113 @@ def is_panel_owner(chat_id: int, message_id: int, user_id: int) -> bool:
         return True
     return owner == user_id
 
+
+# ---------------- پروفایل «جوجویی» (شکم، تولید خودکار پوینت، مقام ویژه) ----------------
+
+def get_jojoyi_stats(user_id: int):
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM jojoyi_stats WHERE user_id = ?", (user_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def create_jojoyi_stats_if_not_exists(user_id: int, belly_max: int, production_rate: float, production_capacity: int):
+    conn = get_connection()
+    existing = conn.execute("SELECT 1 FROM jojoyi_stats WHERE user_id = ?", (user_id,)).fetchone()
+    if existing:
+        conn.close()
+        return False
+    now = int(time.time())
+    conn.execute(
+        """INSERT INTO jojoyi_stats
+           (user_id, belly, belly_max, production_rate, production_capacity,
+            last_production_time, last_belly_drop_time)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (user_id, belly_max, belly_max, production_rate, production_capacity, now, now),
+    )
+    conn.commit()
+    conn.close()
+    return True
+
+
+def apply_jojoyi_production(user_id: int, belly_drop_interval_seconds: int):
+    """
+    محاسبه‌ی تولید خودکار پوینت از آخرین باری که چک شده تا الان، و کم شدن شکم با گذر زمان.
+    این تابع رو قبل از نمایش پروفایل «جوجویی» صدا بزن تا اعداد به‌روز باشن.
+    """
+    stats = get_jojoyi_stats(user_id)
+    if not stats:
+        return
+
+    now = int(time.time())
+    elapsed_production = now - stats["last_production_time"]
+
+    if elapsed_production > 0 and stats["belly"] > 0:
+        # فقط وقتی شکم سیره (بیشتر از صفر) تولید انجام میشه
+        produced = int(elapsed_production * stats["production_rate"])
+        if produced > 0:
+            new_pending = min(stats["pending_points"] + produced, stats["production_capacity"])
+            conn = get_connection()
+            conn.execute(
+                """UPDATE jojoyi_stats
+                   SET pending_points = ?, produced_total = produced_total + ?, last_production_time = ?
+                   WHERE user_id = ?""",
+                (new_pending, produced, now, user_id),
+            )
+            conn.commit()
+            conn.close()
+
+    # کم شدن شکم با گذر زمان (هر belly_drop_interval_seconds، یک واحد کم میشه)
+    elapsed_belly = now - stats["last_belly_drop_time"]
+    drops = elapsed_belly // belly_drop_interval_seconds
+    if drops > 0 and stats["belly"] > 0:
+        new_belly = max(stats["belly"] - drops, 0)
+        new_drop_time = stats["last_belly_drop_time"] + drops * belly_drop_interval_seconds
+        conn = get_connection()
+        conn.execute(
+            "UPDATE jojoyi_stats SET belly = ?, last_belly_drop_time = ? WHERE user_id = ?",
+            (new_belly, new_drop_time, user_id),
+        )
+        conn.commit()
+        conn.close()
+
+
+def feed_jojoyi(user_id: int, belly_restore_amount: int):
+    """کرم دادن: شکم رو پر میکنه (تا سقف belly_max)"""
+    conn = get_connection()
+    conn.execute(
+        """UPDATE jojoyi_stats
+           SET belly = MIN(belly + ?, belly_max), last_belly_drop_time = strftime('%s','now')
+           WHERE user_id = ?""",
+        (belly_restore_amount, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def collect_jojoyi_points(user_id: int) -> int:
+    """پوینت‌های جمع‌شده رو به موجودی اصلی (meow_points) منتقل میکنه. مقدار منتقل‌شده رو برمیگردونه."""
+    stats = get_jojoyi_stats(user_id)
+    if not stats or stats["pending_points"] <= 0:
+        return 0
+
+    amount = stats["pending_points"]
+    conn = get_connection()
+    conn.execute("UPDATE jojoyi_stats SET pending_points = 0 WHERE user_id = ?", (user_id,))
+    conn.execute("UPDATE users SET meow_points = meow_points + ? WHERE user_id = ?", (amount, user_id))
+    conn.commit()
+    conn.close()
+    return amount
+
+
+def upgrade_jojoyi_rank(user_id: int, new_rank: int, new_belly_max: int, new_production_rate: float, new_capacity: int):
+    conn = get_connection()
+    conn.execute(
+        """UPDATE jojoyi_stats
+           SET jojoyi_rank = ?, belly_max = ?, production_rate = ?, production_capacity = ?
+           WHERE user_id = ?""",
+        (new_rank, new_belly_max, new_production_rate, new_capacity, user_id),
+    )
+    conn.commit()
+    conn.close()
+
