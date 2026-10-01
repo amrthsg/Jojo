@@ -276,3 +276,14 @@ def smuggling_chick_count_kb(min_chicks: int, max_chicks: int) -> InlineKeyboard
     kb = [[InlineKeyboardButton(text=f"{n} جوجه", callback_data=f"smuggle_go_{n}")] for n in options]
     kb.append([InlineKeyboardButton(text="🔙 بازگشت", callback_data="smuggling_back")])
     return InlineKeyboardMarkup(inline_keyboard=kb)
+
+
+# ---------------- پروفایل «جوجویی» ----------------
+
+def jojoyi_menu_kb(has_pending: bool, can_upgrade: bool) -> InlineKeyboardMarkup:
+    kb = []
+    if has_pending:
+        kb.append([InlineKeyboardButton(text="🪙 برداشت پوینت‌ها", callback_data="jojoyi_collect")])
+    if can_upgrade:
+        kb.append([InlineKeyboardButton(text="⭐ ارتقا مقام", callback_data="jojoyi_upgrade")])
+    return InlineKeyboardMarkup(inline_keyboard=kb) if kb else None
